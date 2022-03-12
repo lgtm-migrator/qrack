@@ -685,9 +685,8 @@ void QBdt::ApplySingle(const complex* mtrx, bitLenInt target)
             return (bitCapInt)0U;
         }
 
-        leaf->Branch();
-
         if (isKet) {
+            leaf->Branch();
             QInterfacePtr qi = NODE_TO_QINTERFACE(leaf);
             if (qis.find(qi) == qis.end()) {
                 try {
@@ -796,9 +795,8 @@ void QBdt::ApplyControlledSingle(
             return (bitCapInt)0U;
         }
 
-        leaf->Branch();
-
         if (isKet) {
+            leaf->Branch();
             QInterfacePtr qi = NODE_TO_QINTERFACE(leaf);
             if (qis.find(qi) == qis.end()) {
                 try {
