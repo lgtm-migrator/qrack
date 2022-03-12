@@ -685,6 +685,8 @@ void QBdt::ApplySingle(const complex* mtrx, bitLenInt target)
             return (bitCapInt)0U;
         }
 
+        leaf->Branch();
+
         if (isKet) {
             QInterfacePtr qi = NODE_TO_QINTERFACE(leaf);
             if (qis.find(qi) == qis.end()) {
@@ -793,6 +795,8 @@ void QBdt::ApplyControlledSingle(
         if (IS_NORM_0(leaf->scale)) {
             return (bitCapInt)0U;
         }
+
+        leaf->Branch();
 
         if (isKet) {
             QInterfacePtr qi = NODE_TO_QINTERFACE(leaf);
