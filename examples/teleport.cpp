@@ -35,7 +35,8 @@ void StatePrep(QInterfacePtr qReg)
 
 int main()
 {
-    QInterfacePtr qReg = CreateQuantumInterface(QINTERFACE_OPTIMAL, 3, 0);
+    QBdtPtr qReg = std::dynamic_pointer_cast<QBdt>(CreateQuantumInterface({ QINTERFACE_BDT }, 1, 0));
+    qReg->Attach(std::dynamic_pointer_cast<QStabilizer>(CreateQuantumInterface({ QINTERFACE_STABILIZER }, 2, 0)));
     // "Eve" prepares a Bell pair.
     qReg->H(1);
     qReg->CNOT(1, 2);

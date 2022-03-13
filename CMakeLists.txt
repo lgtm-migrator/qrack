@@ -29,6 +29,7 @@ add_library (qrack STATIC
     src/qunit.cpp
     src/qpager.cpp
     src/qstabilizer.cpp
+    src/qstabilizerextended.cpp
     src/qstabilizerhybrid.cpp
     src/qmaskfusion.cpp
     )
@@ -247,6 +248,7 @@ install (FILES
     include/qhybrid.hpp
     include/qmaskfusion.hpp
     include/qstabilizer.hpp
+    include/qstabilizerextended.hpp
     include/qstabilizerhybrid.hpp
     include/qbdt.hpp
     include/qbdt_node.hpp
