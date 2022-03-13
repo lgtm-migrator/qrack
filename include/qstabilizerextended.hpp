@@ -58,6 +58,8 @@ public:
     void SetPermutation(const bitCapInt& perm) { qbdt->SetPermutation(perm); }
 
 public:
+    /// Apply an arbitrary single bit unitary transformation
+    virtual void Mtrx(const complex* mtrx, bitLenInt t) { qbdt->Mtrx(mtrx, t); }
     /// Apply an X (or NOT) gate to target
     virtual void X(bitLenInt t) { qbdt->X(t); }
     /// Apply a Pauli Y gate to target
