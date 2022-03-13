@@ -18,6 +18,19 @@
 // philosophy aims to raise the floor of decentralized quantum computing technology access across all modern platforms,
 // for all people, not commercialization.
 //
+// Also adapted from:
+//
+// ...the methodology of quantum binary decision trees, as explained in,
+
+// How to Efficiently Handle Complex Values?
+// Implementing Decision Diagrams for Quantum Computing
+// Alwin Zulehner, Stefan Hillmich, and Robert Wille
+// Institute for Integrated Circuits, Johannes Kepler University Linz, Austria.
+// https://arxiv.org/abs/1911.12691
+//
+// This is part of the Qrack API by Daniel Strano and the Qrack contributors, instituted in Qrack v7, with thanks to all
+// contributors, in all forms of contribution, including but not limited to licensed reuse.
+//
 // Licensed under the GNU Lesser General Public License V3.
 // See LICENSE.md in the project root or https://www.gnu.org/licenses/lgpl-3.0.en.html
 // for details.
