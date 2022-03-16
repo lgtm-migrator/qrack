@@ -17,14 +17,14 @@
 #pragma once
 
 #include "qbdt_node_interface.hpp"
-#include "qinterface.hpp"
+#include "qstabilizer.hpp"
 
 namespace Qrack {
 
-class QBdtQInterfaceNode;
-typedef std::shared_ptr<QBdtQInterfaceNode> QBdtQInterfaceNodePtr;
+class QBdtQStabilizerNode;
+typedef std::shared_ptr<QBdtQStabilizerNode> QBdtQStabilizerNodePtr;
 
-class QBdtQInterfaceNode : public QBdtNodeInterface {
+class QBdtQStabilizerNode : public QBdtNodeInterface {
 protected:
 #if ENABLE_COMPLEX_X2
     virtual void PushStateVector(const complex2& mtrxCol1, const complex2& mtrxCol2, QBdtNodeInterfacePtr& b0,
@@ -34,20 +34,20 @@ protected:
         const complex* mtrx, QBdtNodeInterfacePtr& b0, QBdtNodeInterfacePtr& b1, bitLenInt depth)
 #endif
     {
-        throw std::out_of_range("QBdtQInterfaceNode::PushStateVector() not implemented!");
+        throw std::out_of_range("QBdtQStabilizerNode::PushStateVector() not implemented!");
     }
 
 public:
-    QInterfacePtr qReg;
+    QStabilizerPtr qReg;
 
-    QBdtQInterfaceNode()
+    QBdtQStabilizerNode()
         : QBdtNodeInterface(ZERO_CMPLX)
         , qReg(NULL)
     {
         // Intentionally left blank.
     }
 
-    QBdtQInterfaceNode(complex scl, QInterfacePtr q)
+    QBdtQStabilizerNode(complex scl, QStabilizerPtr q)
         : QBdtNodeInterface(scl)
         , qReg(q)
     {
@@ -60,11 +60,13 @@ public:
         qReg = NULL;
     }
 
-    virtual QBdtNodeInterfacePtr ShallowClone() { return std::make_shared<QBdtQInterfaceNode>(scale, qReg); }
+    virtual QBdtNodeInterfacePtr ShallowClone() { return std::make_shared<QBdtQStabilizerNode>(scale, qReg); }
 
     virtual bool isEqual(QBdtNodeInterfacePtr r);
 
     virtual bool isEqualUnder(QBdtNodeInterfacePtr r);
+
+    virtual QBdtNodeInterfacePtr PopSpecial();
 
     virtual void Normalize(bitLenInt depth);
 
@@ -76,7 +78,10 @@ public:
 
     virtual QBdtNodeInterfacePtr RemoveSeparableAtDepth(bitLenInt depth, const bitLenInt& size);
 
-    virtual void PopStateVector(bitLenInt depth = 1U);
+    virtual void PopStateVector(bitLenInt depth = 1U)
+    {
+        throw std::out_of_range("QBdtQStabilizerNode::PopStateVector() not implemented!");
+    }
 
 #if ENABLE_COMPLEX_X2
     virtual void Apply2x2(const complex2& mtrxCol1, const complex2& mtrxCol2, bitLenInt depth)
@@ -84,7 +89,7 @@ public:
     virtual void Apply2x2(const complex* mtrx, bitLenInt depth)
 #endif
     {
-        throw std::out_of_range("QBdtQInterfaceNode::Apply2x2() not implemented!");
+        throw std::out_of_range("QBdtQStabilizerNode::Apply2x2() not implemented!");
     }
 #if ENABLE_COMPLEX_X2
     virtual void PushSpecial(const complex2& mtrxCol1, const complex2& mtrxCol2, QBdtNodeInterfacePtr& b1);

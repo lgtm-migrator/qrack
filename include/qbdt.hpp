@@ -16,10 +16,10 @@
 
 #pragma once
 
-#include "qbdt_qinterface_node.hpp"
+#include "qbdt_qstabilizer_node.hpp"
 #include "qstabilizer.hpp"
 
-#define NODE_TO_QINTERFACE(leaf) (std::dynamic_pointer_cast<QBdtQInterfaceNode>(leaf)->qReg)
+#define NODE_TO_QINTERFACE(leaf) (std::dynamic_pointer_cast<QBdtQStabilizerNode>(leaf)->qReg)
 #define QINTERFACE_TO_QALU(qReg) std::dynamic_pointer_cast<QAlu>(qReg)
 #define QINTERFACE_TO_QPARITY(qReg) std::dynamic_pointer_cast<QParity>(qReg)
 
@@ -37,33 +37,17 @@ protected:
     std::vector<QInterfaceEngine> engines;
     int devID;
     QBdtNodeInterfacePtr root;
-    bitLenInt attachedQubitCount;
-    bitLenInt bdtQubitCount;
-    bitCapInt bdtMaxQPower;
-    bool isAttached;
-
-    virtual void SetQubitCount(bitLenInt qb, bitLenInt aqb)
-    {
-        attachedQubitCount = aqb;
-        SetQubitCount(qb);
-    }
-
-    virtual void SetQubitCount(bitLenInt qb)
-    {
-        QInterface::SetQubitCount(qb);
-        bdtQubitCount = qubitCount - attachedQubitCount;
-        bdtMaxQPower = pow2(bdtQubitCount);
-    }
-
-    QBdtQInterfaceNodePtr MakeQEngineNode(complex scale, bitLenInt qbCount, bitCapInt perm = 0U);
+    QInterfacePtr stateVec;
 
     void FallbackMtrx(const complex* mtrx, bitLenInt target);
     void FallbackMCMtrx(
         const complex* mtrx, const bitLenInt* controls, bitLenInt controlLen, bitLenInt target, bool isAnti);
 
+    QInterfacePtr MakeQInterface(bitLenInt qbCount);
+    QStabilizerPtr MakeQStabilizer(bitLenInt qbCount, bitLenInt perm);
     QInterfacePtr MakeTempStateVector()
     {
-        QInterfacePtr copyPtr = NODE_TO_QINTERFACE(MakeQEngineNode(ONE_R1, qubitCount));
+        QInterfacePtr copyPtr = MakeQInterface(qubitCount);
         Finish();
         GetQuantumState(copyPtr);
 
@@ -72,28 +56,23 @@ protected:
     }
     void SetStateVector()
     {
-        if (!bdtQubitCount) {
+        if (stateVec) {
             return;
         }
 
-        if (isAttached) {
-            throw std::domain_error("QBdt::SetStateVector() not yet implemented, after Attach() call!");
-        }
-
-        QBdtQInterfaceNodePtr nRoot = MakeQEngineNode(ONE_R1, qubitCount);
-        GetQuantumState(NODE_TO_QINTERFACE(nRoot));
-        root = nRoot;
+        stateVec = MakeQInterface(qubitCount);
+        GetQuantumState(stateVec);
+        root = NULL;
         SetQubitCount(qubitCount, qubitCount);
     }
     void ResetStateVector()
     {
-        if (bdtQubitCount) {
+        if (!stateVec) {
             return;
         }
 
-        QBdtQInterfaceNodePtr oRoot = std::dynamic_pointer_cast<QBdtQInterfaceNode>(root);
         SetQubitCount(qubitCount, 0U);
-        SetQuantumState(NODE_TO_QINTERFACE(oRoot));
+        SetQuantumState(stateVec);
     }
 
     template <typename Fn> void GetTraversal(Fn getLambda);
@@ -153,7 +132,7 @@ public:
     virtual void NormalizeState(
         real1_f nrm = REAL1_DEFAULT_ARG, real1_f norm_thresh = REAL1_DEFAULT_ARG, real1_f phaseArg = ZERO_R1)
     {
-        root->Normalize(bdtQubitCount);
+        root->Normalize(qubitCount);
     }
 
     virtual real1_f SumSqrDiff(QInterfacePtr toCompare)
@@ -184,20 +163,6 @@ public:
     {
         return Compose(std::dynamic_pointer_cast<QBdt>(toCopy), start);
     }
-    virtual bitLenInt Attach(QStabilizerPtr toCopy, bitLenInt start)
-    {
-        if (start == qubitCount) {
-            return Attach(toCopy);
-        }
-
-        const bitLenInt origSize = qubitCount;
-        ROL(origSize - start, 0, qubitCount);
-        bitLenInt result = Attach(toCopy, qubitCount);
-        ROR(origSize - start, 0, qubitCount);
-
-        return result;
-    }
-    virtual bitLenInt Attach(QStabilizerPtr toCopy);
     virtual void Decompose(bitLenInt start, QInterfacePtr dest)
     {
         DecomposeDispose(start, dest->GetQubitCount(), std::dynamic_pointer_cast<QBdt>(dest));
@@ -231,7 +196,7 @@ public:
 
     virtual real1_f ProbParity(bitCapInt mask)
     {
-        QInterfacePtr unit = (!bdtQubitCount) ? NODE_TO_QINTERFACE(root) : MakeTempStateVector();
+        QInterfacePtr unit = stateVec ? stateVec : MakeTempStateVector();
         return QINTERFACE_TO_QPARITY(unit)->ProbParity(mask);
     }
     virtual void CUniformParityRZ(const bitLenInt* controls, bitLenInt controlLen, bitCapInt mask, real1_f angle)
