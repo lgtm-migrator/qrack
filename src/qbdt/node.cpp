@@ -332,13 +332,11 @@ void QBdtNode::PushStateVector(const complex2& mtrxCol1, const complex2& mtrxCol
     b0->Branch();
     b1->Branch();
 
-    if (!b0->branches[0] || !b1->branches[0]) {
-        b0->PushSpecial(mtrxCol1, mtrxCol2, b1);
-
-        b0->PopStateVector();
-        b1->PopStateVector();
-
-        return;
+    if (!b0->branches[0]) {
+        b0 = b0->PopSpecial();
+    }
+    if (!b1->branches[0]) {
+        b1 = b1->PopSpecial();
     }
 
     b0->branches[0]->scale *= b0->scale;
