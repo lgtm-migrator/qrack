@@ -3601,8 +3601,8 @@ TEST_CASE("test_attach")
     std::cout << ">>> 'test_attach':" << std::endl;
 
     QInterfacePtr qftReg = CreateQuantumInterface({ QINTERFACE_BDT }, 1U, 0, rng);
-    std::dynamic_pointer_cast<QBdt>(qftReg)->Attach(std::dynamic_pointer_cast<QEngine>(
-        CreateQuantumInterface({ QINTERFACE_STABILIZER_HYBRID }, 1U, 0, rng, CMPLX_DEFAULT_ARG, false, false)));
+    std::dynamic_pointer_cast<QBdt>(qftReg)->Attach(std::dynamic_pointer_cast<QStabilizer>(
+        CreateQuantumInterface({ QINTERFACE_STABILIZER }, 1U, 0, rng, CMPLX_DEFAULT_ARG, false, false)));
 
     qftReg->SetPermutation(0x2);
     qftReg->H(0);
@@ -6016,8 +6016,8 @@ TEST_CASE("test_mirror_circuit_26", "[mirror]")
     std::cout << ">>> 'test_mirror_circuit_26':" << std::endl;
 
     QInterfacePtr qftReg = CreateQuantumInterface({ QINTERFACE_BDT }, 1U, 0, rng);
-    std::dynamic_pointer_cast<QBdt>(qftReg)->Attach(std::dynamic_pointer_cast<QEngine>(
-        CreateQuantumInterface({ QINTERFACE_STABILIZER_HYBRID }, 2U, 0, rng, CMPLX_DEFAULT_ARG, false, false)));
+    std::dynamic_pointer_cast<QBdt>(qftReg)->Attach(std::dynamic_pointer_cast<QStabilizer>(
+        CreateQuantumInterface({ QINTERFACE_STABILIZER }, 2U, 0, rng, CMPLX_DEFAULT_ARG, false, false)));
 
     qftReg->SetPermutation(7);
 
@@ -6459,8 +6459,8 @@ TEST_CASE("test_mirror_near_clifford", "[mirror]")
     real1_f tRate = ZERO_R1;
     for (int trial = 0; trial < TRIALS; trial++) {
         QInterfacePtr testCase = CreateQuantumInterface({ QINTERFACE_BDT }, magic, 0, rng);
-        std::dynamic_pointer_cast<QBdt>(testCase)->Attach(std::dynamic_pointer_cast<QEngine>(CreateQuantumInterface(
-            { QINTERFACE_STABILIZER_HYBRID }, n - magic, 0, rng, CMPLX_DEFAULT_ARG, false, false)));
+        std::dynamic_pointer_cast<QBdt>(testCase)->Attach(std::dynamic_pointer_cast<QStabilizer>(
+            CreateQuantumInterface({ QINTERFACE_STABILIZER }, n - magic, 0, rng, CMPLX_DEFAULT_ARG, false, false)));
 
         std::vector<std::vector<int>> gate1QbRands(Depth);
         std::vector<std::vector<MultiQubitGate>> gateMultiQbRands(Depth);
@@ -6660,8 +6660,8 @@ TEST_CASE("test_mirror_quantum_volume", "[mirror]")
 
     for (int trial = 0; trial < TRIALS; trial++) {
         QInterfacePtr testCase = CreateQuantumInterface({ QINTERFACE_BDT }, magic, 0, rng);
-        std::dynamic_pointer_cast<QBdt>(testCase)->Attach(std::dynamic_pointer_cast<QEngine>(CreateQuantumInterface(
-            { QINTERFACE_STABILIZER_HYBRID }, n - magic, 0, rng, CMPLX_DEFAULT_ARG, false, false)));
+        std::dynamic_pointer_cast<QBdt>(testCase)->Attach(std::dynamic_pointer_cast<QStabilizer>(
+            CreateQuantumInterface({ QINTERFACE_STABILIZER }, n - magic, 0, rng, CMPLX_DEFAULT_ARG, false, false)));
 
         std::vector<std::vector<int>> gate1QbRands(Depth);
         std::vector<std::vector<MultiQubitGate>> gateMultiQbRands(Depth);

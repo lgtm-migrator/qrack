@@ -14,12 +14,13 @@
 // See LICENSE.md in the project root or https://www.gnu.org/licenses/lgpl-3.0.en.html
 // for details.
 
-#include "qbdt_qengine_node.hpp"
+#include "qbdt_qinterface_node.hpp"
+#include "qengine.hpp"
 
 #define IS_SAME_AMP(a, b) (norm((a) - (b)) <= (REAL1_EPSILON * REAL1_EPSILON))
 
 namespace Qrack {
-bool QBdtQEngineNode::isEqual(QBdtNodeInterfacePtr r)
+bool QBdtQInterfaceNode::isEqual(QBdtNodeInterfacePtr r)
 {
     if (!r) {
         return false;
@@ -37,7 +38,7 @@ bool QBdtQEngineNode::isEqual(QBdtNodeInterfacePtr r)
         return true;
     }
 
-    QEnginePtr rReg = std::dynamic_pointer_cast<QBdtQEngineNode>(r)->qReg;
+    QInterfacePtr rReg = std::dynamic_pointer_cast<QBdtQInterfaceNode>(r)->qReg;
 
     if (qReg.get() == rReg.get()) {
         return true;
@@ -51,7 +52,7 @@ bool QBdtQEngineNode::isEqual(QBdtNodeInterfacePtr r)
     return false;
 }
 
-bool QBdtQEngineNode::isEqualUnder(QBdtNodeInterfacePtr r)
+bool QBdtQInterfaceNode::isEqualUnder(QBdtNodeInterfacePtr r)
 {
     if (!r) {
         return false;
@@ -65,7 +66,7 @@ bool QBdtQEngineNode::isEqualUnder(QBdtNodeInterfacePtr r)
         return IS_NORM_0(r->scale);
     }
 
-    QEnginePtr rReg = std::dynamic_pointer_cast<QBdtQEngineNode>(r)->qReg;
+    QInterfacePtr rReg = std::dynamic_pointer_cast<QBdtQInterfaceNode>(r)->qReg;
 
     if (qReg.get() == rReg.get()) {
         return true;
@@ -79,7 +80,7 @@ bool QBdtQEngineNode::isEqualUnder(QBdtNodeInterfacePtr r)
     return false;
 }
 
-void QBdtQEngineNode::Normalize(bitLenInt depth)
+void QBdtQInterfaceNode::Normalize(bitLenInt depth)
 {
     if (!depth) {
         return;
@@ -96,7 +97,7 @@ void QBdtQEngineNode::Normalize(bitLenInt depth)
     }
 }
 
-void QBdtQEngineNode::Branch(bitLenInt depth)
+void QBdtQInterfaceNode::Branch(bitLenInt depth)
 {
     if (!depth) {
         return;
@@ -108,11 +109,11 @@ void QBdtQEngineNode::Branch(bitLenInt depth)
     }
 
     if (qReg) {
-        qReg = std::dynamic_pointer_cast<QEngine>(qReg->Clone());
+        qReg = qReg->Clone();
     }
 }
 
-void QBdtQEngineNode::Prune(bitLenInt depth)
+void QBdtQInterfaceNode::Prune(bitLenInt depth)
 {
     if (IS_NORM_0(scale)) {
         SetZero();
@@ -124,44 +125,44 @@ void QBdtQEngineNode::Prune(bitLenInt depth)
     scale *= std::polar(ONE_R1, (real1)phaseArg);
 }
 
-void QBdtQEngineNode::InsertAtDepth(QBdtNodeInterfacePtr b, bitLenInt depth, const bitLenInt& size)
+void QBdtQInterfaceNode::InsertAtDepth(QBdtNodeInterfacePtr b, bitLenInt depth, const bitLenInt& size)
 {
     if (IS_NORM_0(scale)) {
         return;
     }
 
     if (depth) {
-        throw std::runtime_error("QBdtQEngineNode::InsertAtDepth() not implemented for nonzero depth!");
+        throw std::runtime_error("QBdtQInterfaceNode::InsertAtDepth() not implemented for nonzero depth!");
     }
 
-    QBdtQEngineNodePtr bEng = std::dynamic_pointer_cast<QBdtQEngineNode>(b);
+    QBdtQInterfaceNodePtr bEng = std::dynamic_pointer_cast<QBdtQInterfaceNode>(b);
     qReg->Compose(bEng->qReg, 0U);
 }
 
-QBdtNodeInterfacePtr QBdtQEngineNode::RemoveSeparableAtDepth(bitLenInt depth, const bitLenInt& size)
+QBdtNodeInterfacePtr QBdtQInterfaceNode::RemoveSeparableAtDepth(bitLenInt depth, const bitLenInt& size)
 {
     if (!size || (IS_NORM_0(scale))) {
         return NULL;
     }
 
-    QBdtQEngineNodePtr toRet = std::dynamic_pointer_cast<QBdtQEngineNode>(ShallowClone());
+    QBdtQInterfaceNodePtr toRet = std::dynamic_pointer_cast<QBdtQInterfaceNode>(ShallowClone());
     toRet->scale /= abs(toRet->scale);
 
     if (!qReg) {
         return toRet;
     }
 
-    toRet->qReg = std::dynamic_pointer_cast<QEngine>(qReg->Decompose(depth, size));
+    toRet->qReg = qReg->Decompose(depth, size);
 
     return toRet;
 }
 
 #if ENABLE_COMPLEX_X2
-void QBdtQEngineNode::PushSpecial(const complex2& mtrxCol1, const complex2& mtrxCol2, QBdtNodeInterfacePtr& b1)
+void QBdtQInterfaceNode::PushSpecial(const complex2& mtrxCol1, const complex2& mtrxCol2, QBdtNodeInterfacePtr& b1)
 {
     const complex mtrx[4] = { mtrxCol1.c[0], mtrxCol2.c[0], mtrxCol1.c[1], mtrxCol2.c[1] };
 #else
-void QBdtQEngineNode::PushSpecial(const complex* mtrx, QBdtNodeInterfacePtr& b1)
+void QBdtQInterfaceNode::PushSpecial(const complex* mtrx, QBdtNodeInterfacePtr& b1)
 {
 #endif
     const bool is0Zero = IS_NORM_0(scale);
@@ -174,13 +175,18 @@ void QBdtQEngineNode::PushSpecial(const complex* mtrx, QBdtNodeInterfacePtr& b1)
         return;
     }
 
-    QEnginePtr qReg0 = qReg;
-    QEnginePtr qReg1 = std::dynamic_pointer_cast<QBdtQEngineNode>(b1)->qReg;
+    QBdtQInterfaceNodePtr b1Engine = std::dynamic_pointer_cast<QBdtQInterfaceNode>(b1);
+    if (qReg->isClifford() || b1Engine->qReg->isClifford()) {
+        throw std::domain_error("Handle QBdtQInterfaceNode::PushSpecial() as extended stabilizer!");
+    }
+
+    QEnginePtr qReg0 = std::dynamic_pointer_cast<QEngine>(qReg);
+    QEnginePtr qReg1 = std::dynamic_pointer_cast<QEngine>(b1Engine->qReg);
 
     if (is0Zero) {
-        qReg0 = std::dynamic_pointer_cast<QBdtQEngineNode>(b1)->qReg->CloneEmpty();
+        qReg0 = qReg1->CloneEmpty();
     } else if (is1Zero) {
-        qReg1 = qReg->CloneEmpty();
+        qReg1 = qReg0->CloneEmpty();
     }
 
     qReg0->NormalizeState(ONE_R1 / norm(scale), REAL1_DEFAULT_ARG, std::arg(scale));
@@ -197,25 +203,31 @@ void QBdtQEngineNode::PushSpecial(const complex* mtrx, QBdtNodeInterfacePtr& b1)
     qReg0->ShuffleBuffers(qReg1);
 
     qReg = qReg0;
-    std::dynamic_pointer_cast<QBdtQEngineNode>(b1)->qReg = qReg1;
+    std::dynamic_pointer_cast<QBdtQInterfaceNode>(b1)->qReg = qReg1;
 }
 
-void QBdtQEngineNode::PopStateVector(bitLenInt depth)
+void QBdtQInterfaceNode::PopStateVector(bitLenInt depth)
 {
     if (IS_NORM_0(scale)) {
         SetZero();
         return;
     }
 
-    qReg->UpdateRunningNorm();
-    const real1_f nrm = qReg->GetRunningNorm();
+    if (qReg->isClifford()) {
+        return;
+    }
+
+    QEnginePtr qEngine = std::dynamic_pointer_cast<QEngine>(qReg);
+
+    qEngine->UpdateRunningNorm();
+    const real1_f nrm = qEngine->GetRunningNorm();
 
     if (nrm <= FP_NORM_EPSILON) {
         SetZero();
         return;
     }
 
-    qReg->NormalizeState();
+    qEngine->NormalizeState();
     scale = std::polar((real1)sqrt(nrm), ZERO_R1);
 }
 } // namespace Qrack
