@@ -3592,53 +3592,6 @@ TEST_CASE_METHOD(QInterfaceTestFixture, "test_ciadc")
     REQUIRE_THAT(qftReg, HasProbability(0, 8, 2));
 }
 
-TEST_CASE("test_attach")
-{
-    if (testEngineType != QINTERFACE_BDT) {
-        std::cout << ">>> 'test_attach': skipped" << std::endl;
-        return;
-    }
-    std::cout << ">>> 'test_attach':" << std::endl;
-
-    QInterfacePtr qftReg = CreateQuantumInterface({ QINTERFACE_BDT }, 1U, 0, rng);
-    std::dynamic_pointer_cast<QBdt>(qftReg)->Attach(std::dynamic_pointer_cast<QStabilizer>(
-        CreateQuantumInterface({ QINTERFACE_STABILIZER }, 1U, 0, rng, CMPLX_DEFAULT_ARG, false, false)));
-
-    qftReg->SetPermutation(0x2);
-    qftReg->H(0);
-    REQUIRE_THAT(qftReg, HasProbability(1, 1, 0x1));
-    qftReg->CZ(1, 0);
-    REQUIRE_THAT(qftReg, HasProbability(1, 1, 0x1));
-    qftReg->H(0);
-    REQUIRE_THAT(qftReg, HasProbability(0x3));
-
-    qftReg->SetPermutation(0x2);
-    qftReg->X(0);
-    qftReg->H(1);
-    qftReg->CNOT(1, 0);
-    qftReg->H(0);
-    qftReg->H(1);
-    qftReg->CNOT(1, 0);
-    qftReg->CNOT(1, 0);
-    qftReg->H(1);
-    qftReg->H(0);
-    qftReg->CNOT(1, 0);
-    qftReg->H(1);
-    qftReg->X(0);
-    REQUIRE(qftReg->MAll() == 0x2);
-
-    qftReg->SetPermutation(0);
-    qftReg->H(0);
-    qftReg->CNOT(0, 1);
-    qftReg->X(0);
-    qftReg->CNOT(1, 0);
-    qftReg->CNOT(1, 0);
-    qftReg->X(0);
-    qftReg->CNOT(0, 1);
-    qftReg->H(0);
-    REQUIRE(qftReg->MAll() == 0);
-}
-
 int qRand(int high, QInterfacePtr q)
 {
     int rand = (int)(high * q->Rand());
@@ -6007,32 +5960,6 @@ TEST_CASE_METHOD(QInterfaceTestFixture, "test_mirror_circuit_25", "[mirror]")
     REQUIRE(qftReg->MAll() == 2);
 }
 
-TEST_CASE("test_mirror_circuit_26", "[mirror]")
-{
-    if (testEngineType != QINTERFACE_BDT) {
-        std::cout << ">>> 'test_mirror_circuit_26': skipped" << std::endl;
-        return;
-    }
-    std::cout << ">>> 'test_mirror_circuit_26':" << std::endl;
-
-    QInterfacePtr qftReg = CreateQuantumInterface({ QINTERFACE_BDT }, 1U, 0, rng);
-    std::dynamic_pointer_cast<QBdt>(qftReg)->Attach(std::dynamic_pointer_cast<QStabilizer>(
-        CreateQuantumInterface({ QINTERFACE_STABILIZER }, 2U, 0, rng, CMPLX_DEFAULT_ARG, false, false)));
-
-    qftReg->SetPermutation(7);
-
-    qftReg->H(1);
-    qftReg->Z(0);
-    qftReg->S(1);
-    qftReg->Swap(2, 1);
-    qftReg->Swap(2, 1);
-    qftReg->IS(1);
-    qftReg->Z(0);
-    qftReg->H(1);
-
-    REQUIRE(qftReg->MAll() == 7);
-}
-
 bitLenInt pickRandomBit(QInterfacePtr qReg, std::set<bitLenInt>* unusedBitsPtr)
 {
     std::set<bitLenInt>::iterator bitIterator = unusedBitsPtr->begin();
@@ -6459,8 +6386,6 @@ TEST_CASE("test_mirror_near_clifford", "[mirror]")
     real1_f tRate = ZERO_R1;
     for (int trial = 0; trial < TRIALS; trial++) {
         QInterfacePtr testCase = CreateQuantumInterface({ QINTERFACE_BDT }, magic, 0, rng);
-        std::dynamic_pointer_cast<QBdt>(testCase)->Attach(std::dynamic_pointer_cast<QStabilizer>(
-            CreateQuantumInterface({ QINTERFACE_STABILIZER }, n - magic, 0, rng, CMPLX_DEFAULT_ARG, false, false)));
 
         std::vector<std::vector<int>> gate1QbRands(Depth);
         std::vector<std::vector<MultiQubitGate>> gateMultiQbRands(Depth);
@@ -6660,8 +6585,6 @@ TEST_CASE("test_mirror_quantum_volume", "[mirror]")
 
     for (int trial = 0; trial < TRIALS; trial++) {
         QInterfacePtr testCase = CreateQuantumInterface({ QINTERFACE_BDT }, magic, 0, rng);
-        std::dynamic_pointer_cast<QBdt>(testCase)->Attach(std::dynamic_pointer_cast<QStabilizer>(
-            CreateQuantumInterface({ QINTERFACE_STABILIZER }, n - magic, 0, rng, CMPLX_DEFAULT_ARG, false, false)));
 
         std::vector<std::vector<int>> gate1QbRands(Depth);
         std::vector<std::vector<MultiQubitGate>> gateMultiQbRands(Depth);
