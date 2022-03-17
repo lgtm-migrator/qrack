@@ -100,9 +100,10 @@ bool QBdtQStabilizerNode::isEqualUnder(QBdtNodeInterfacePtr r)
 
 QBdtNodeInterfacePtr QBdtQStabilizerNode::PopSpecial()
 {
+    const bitCapInt maxQPower = qReg->GetMaxQPower();
     complex amp0;
     bitCapInt perm;
-    for (perm = 0U; perm < qReg->GetMaxQPower(); perm++) {
+    for (perm = 0U; perm < maxQPower; perm++) {
         amp0 = qReg->GetAmplitude(perm);
         if (!IS_NORM_0(amp0)) {
             break;
