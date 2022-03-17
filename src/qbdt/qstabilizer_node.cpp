@@ -114,8 +114,12 @@ QBdtNodeInterfacePtr QBdtQStabilizerNode::PopSpecial()
         amp1 = amp0;
         amp0 = ZERO_CMPLX;
     } else {
-        amp1 = qReg->GetAmplitude(perm + 1U);
+        // 0 index bit is definitely 0, so +1.
+        amp1 = qReg->GetAmplitude(perm | 1U);
     }
+    const real1 len = (real1)sqrt(norm(amp0) + norm(amp1));
+    amp0 /= len;
+    amp1 /= len;
 
     QBdtNodeInterfacePtr q[2];
 
