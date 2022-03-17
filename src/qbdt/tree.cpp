@@ -521,6 +521,16 @@ void QBdt::ApplySingle(const complex* mtrx, bitLenInt target)
         return;
     }
 
+    if (!root->branches[0]) {
+        try {
+            NODE_TO_QINTERFACE(root)->Mtrx(mtrx, target);
+        } catch (const std::domain_error&) {
+            FallbackMtrx(mtrx, target);
+        }
+
+        return;
+    }
+
     const bitCapInt qPower = pow2(target);
 
     std::map<QInterfacePtr, bitLenInt> qis;
@@ -553,7 +563,7 @@ void QBdt::ApplySingle(const complex* mtrx, bitLenInt target)
             return (bitCapInt)0U;
         }
 
-        if ((j == target) && (j || root->branches[0])) {
+        if (j == target) {
             isCannotFail = true;
 #if ENABLE_COMPLEX_X2
             leaf->Apply2x2(mtrxCol1, mtrxCol2, qubitCount - target);
@@ -576,11 +586,7 @@ void QBdt::ApplySingle(const complex* mtrx, bitLenInt target)
             for (; j < target; j++) {
                 if (!leaf->branches[0]) {
                     leaf = leaf->PopSpecial();
-                    if (!j) {
-                        root = leaf;
-                    } else {
-                        parent->branches[SelectBit(i, target - (j + 2U))] = leaf;
-                    }
+                    parent->branches[SelectBit(i, target - (j + 2U))] = leaf;
                 } else {
                     leaf->Branch();
                 }
@@ -630,6 +636,21 @@ void QBdt::ApplyControlledSingle(
         } else {
             stateVec->MCMtrx(controls, controlLen, mtrx, target);
         }
+        return;
+    }
+
+    if (!root->branches[0]) {
+        try {
+            QInterfacePtr qi = NODE_TO_QINTERFACE(root);
+            if (isAnti) {
+                qi->MACMtrx(controls, controlLen, mtrx, target);
+            } else {
+                qi->MCMtrx(controls, controlLen, mtrx, target);
+            }
+        } catch (const std::domain_error&) {
+            FallbackMCMtrx(mtrx, controls, controlLen, target, isAnti);
+        }
+
         return;
     }
 
@@ -683,7 +704,7 @@ void QBdt::ApplyControlledSingle(
             return (bitCapInt)0U;
         }
 
-        if ((j == target) && (j || root->branches[0])) {
+        if (j == target) {
             isCannotFail = true;
 #if ENABLE_COMPLEX_X2
             leaf->Apply2x2(mtrxCol1, mtrxCol2, qubitCount - target);
@@ -721,11 +742,7 @@ void QBdt::ApplyControlledSingle(
             for (; j < target; j++) {
                 if (!leaf->branches[0]) {
                     leaf = leaf->PopSpecial();
-                    if (!j) {
-                        root = leaf;
-                    } else {
-                        parent->branches[SelectBit(i, target - (j + 2U))] = leaf;
-                    }
+                    parent->branches[SelectBit(i, target - (j + 2U))] = leaf;
                 } else {
                     leaf->Branch();
                 }
