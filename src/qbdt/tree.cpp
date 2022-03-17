@@ -347,7 +347,7 @@ real1_f QBdt::Prob(bitLenInt qubit)
             continue;
         }
 
-        if (j < qubit) {
+        if ((!j && !root->branches[0]) || (j < qubit)) {
             // Phase effects don't matter, for probability expectation.
             QInterfacePtr qi = NODE_TO_QINTERFACE(leaf);
             if (qiProbs.find(qi) == qiProbs.end()) {
@@ -427,7 +427,7 @@ bool QBdt::ForceM(bitLenInt qubit, bool result, bool doForce, bool doApply)
             continue;
         }
 
-        if (j < qubit) {
+        if ((!j && !root->branches[0]) || (j < qubit)) {
             QInterfacePtr qi = NODE_TO_QINTERFACE(leaf);
             if (qis.find(qi) == qis.end()) {
                 NODE_TO_QINTERFACE(leaf)->ForceM(qubit - j, result, false, true);
