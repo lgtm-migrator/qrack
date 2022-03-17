@@ -38,6 +38,15 @@ bool QBdtQStabilizerNode::isEqual(QBdtNodeInterfacePtr r)
         return true;
     }
 
+    if (r->branches[0]) {
+        // "this" node is "special," but "r" is not.
+
+        // TODO: Numerically compare this case, since QStabilizerHybrid coalesces "that" equivalence with "this,"
+        // stabilizer, by replacing "that" with stabilizer.
+
+        return false;
+    }
+
     QStabilizerPtr rReg = std::dynamic_pointer_cast<QBdtQStabilizerNode>(r)->qReg;
 
     if (qReg.get() == rReg.get()) {
@@ -64,6 +73,15 @@ bool QBdtQStabilizerNode::isEqualUnder(QBdtNodeInterfacePtr r)
 
     if (IS_NORM_0(scale)) {
         return IS_NORM_0(r->scale);
+    }
+    
+    if (r->branches[0]) {
+        // "this" node is "special," but "r" is not.
+
+        // TODO: Numerically compare this case, since QStabilizerHybrid coalesces "that" equivalence with "this,"
+        // stabilizer, by replacing "that" with stabilizer.
+
+        return false;
     }
 
     QStabilizerPtr rReg = std::dynamic_pointer_cast<QBdtQStabilizerNode>(r)->qReg;
