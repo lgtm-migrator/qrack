@@ -91,14 +91,12 @@ QBdtNodeInterfacePtr QBdtQStabilizerNode::PopSpecial()
         }
     }
     const bool isAmp1 = (bool)(perm & 1U);
-    complex phaseFac = ONE_CMPLX;
     complex amp1;
     if (isAmp1) {
         amp1 = amp0;
         amp0 = ZERO_CMPLX;
     } else {
         amp1 = qReg->GetAmplitude(perm + 1U);
-        phaseFac = amp1 / amp0;
     }
 
     QBdtNodeInterfacePtr q[2];
@@ -107,11 +105,13 @@ QBdtNodeInterfacePtr QBdtQStabilizerNode::PopSpecial()
     qReg0->ForceM(0U, false, true);
     qReg0->Dispose(0U, 1U, 0U);
     q[0] = std::make_shared<QBdtQStabilizerNode>(amp0, qReg0);
+    q[0]->Prune();
 
     QStabilizerPtr qReg1 = std::dynamic_pointer_cast<QStabilizer>(qReg->Clone());
     qReg0->ForceM(0U, true, true);
     qReg0->Dispose(0U, 1U, 1U);
-    q[0] = std::make_shared<QBdtQStabilizerNode>(amp1, qReg1);
+    q[1] = std::make_shared<QBdtQStabilizerNode>(amp1, qReg1);
+    q[1]->Prune();
 
     return std::make_shared<QBdtNode>(scale, q);
 }
