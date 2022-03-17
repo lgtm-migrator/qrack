@@ -220,17 +220,4 @@ QBdtNodeInterfacePtr QBdtQStabilizerNode::RemoveSeparableAtDepth(bitLenInt depth
 
     return toRet;
 }
-
-#if ENABLE_COMPLEX_X2
-void QBdtQStabilizerNode::PushSpecial(const complex2& mtrxCol1, const complex2& mtrxCol2, QBdtNodeInterfacePtr& b1)
-{
-    // const complex mtrx[4] = { mtrxCol1.c[0], mtrxCol2.c[0], mtrxCol1.c[1], mtrxCol2.c[1] };
-#else
-void QBdtQStabilizerNode::PushSpecial(const complex* mtrx, QBdtNodeInterfacePtr& b1)
-{
-#endif
-    // TODO: QBdtQStabilizerNodes should "pop off" the lowest index stabilizer qubit into QBDT qubits until the gate can
-    // be completed.
-    throw std::out_of_range("QBdtQStabilizerNode::PushSpecial() not yet implemented!");
-}
 } // namespace Qrack

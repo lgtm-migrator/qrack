@@ -80,7 +80,11 @@ public:
 
     virtual void PopStateVector(bitLenInt depth = 1U)
     {
-        throw std::out_of_range("QBdtQStabilizerNode::PopStateVector() not implemented!");
+        if (!depth) {
+            return;
+        }
+
+        throw std::out_of_range("QBdtQStabilizerNode::PopStateVector() not implemented past 0 depth!");
     }
 
 #if ENABLE_COMPLEX_X2
@@ -91,11 +95,6 @@ public:
     {
         throw std::out_of_range("QBdtQStabilizerNode::Apply2x2() not implemented!");
     }
-#if ENABLE_COMPLEX_X2
-    virtual void PushSpecial(const complex2& mtrxCol1, const complex2& mtrxCol2, QBdtNodeInterfacePtr& b1);
-#else
-    virtual void PushSpecial(const complex* mtrx, QBdtNodeInterfacePtr& b1);
-#endif
 };
 
 } // namespace Qrack

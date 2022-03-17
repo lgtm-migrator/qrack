@@ -569,7 +569,7 @@ void QBdt::ApplySingle(const complex* mtrx, bitLenInt target)
             return (bitCapInt)0U;
         }
 
-        if (j == target) {
+        if ((j == target) && leaf->branches[0]) {
             isCannotFail = true;
 #if ENABLE_COMPLEX_X2
             leaf->Apply2x2(mtrxCol1, mtrxCol2, qubitCount - target);
@@ -710,7 +710,7 @@ void QBdt::ApplyControlledSingle(
             return (bitCapInt)0U;
         }
 
-        if (j == target) {
+        if ((j == target) && leaf->branches[0]) {
             isCannotFail = true;
 #if ENABLE_COMPLEX_X2
             leaf->Apply2x2(mtrxCol1, mtrxCol2, qubitCount - target);
