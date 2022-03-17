@@ -41,10 +41,10 @@ bool QBdtQStabilizerNode::isEqual(QBdtNodeInterfacePtr r)
     if (r->branches[0]) {
         // "this" node is "special," but "r" is not.
 
-        // TODO: Numerically compare this case, since QStabilizerHybrid coalesces "that" equivalence with "this,"
-        // stabilizer, by replacing "that" with stabilizer.
+        QBdtNodeInterfacePtr l = ShallowClone();
+        l->PopSpecial();
 
-        return false;
+        return (l->branches[0] == r->branches[0]) && (l->branches[1] == r->branches[1]);
     }
 
     QStabilizerPtr rReg = std::dynamic_pointer_cast<QBdtQStabilizerNode>(r)->qReg;
@@ -78,10 +78,10 @@ bool QBdtQStabilizerNode::isEqualUnder(QBdtNodeInterfacePtr r)
     if (r->branches[0]) {
         // "this" node is "special," but "r" is not.
 
-        // TODO: Numerically compare this case, since QStabilizerHybrid coalesces "that" equivalence with "this,"
-        // stabilizer, by replacing "that" with stabilizer.
+        QBdtNodeInterfacePtr l = ShallowClone();
+        l->PopSpecial();
 
-        return false;
+        return (l->branches[0] == r->branches[0]) && (l->branches[1] == r->branches[1]);
     }
 
     QStabilizerPtr rReg = std::dynamic_pointer_cast<QBdtQStabilizerNode>(r)->qReg;
@@ -126,17 +126,25 @@ QBdtNodeInterfacePtr QBdtQStabilizerNode::PopSpecial()
 
     QBdtNodeInterfacePtr q[2];
 
-    QStabilizerPtr qReg0 = std::dynamic_pointer_cast<QStabilizer>(qReg->Clone());
-    qReg0->ForceM(0U, false, true);
-    qReg0->Dispose(0U, 1U, 0U);
-    q[0] = std::make_shared<QBdtQStabilizerNode>(amp0, qReg0);
-    q[0]->Prune();
+    if (amp0 == ZERO_CMPLX) {
+        q[0] = std::make_shared<QBdtQStabilizerNode>();
+    } else {
+        QStabilizerPtr qReg0 = std::dynamic_pointer_cast<QStabilizer>(qReg->Clone());
+        qReg0->ForceM(0U, false, true);
+        qReg0->Dispose(0U, 1U, 0U);
+        q[0] = std::make_shared<QBdtQStabilizerNode>(amp0, qReg0);
+        q[0]->Prune();
+    }
 
-    QStabilizerPtr qReg1 = std::dynamic_pointer_cast<QStabilizer>(qReg->Clone());
-    qReg1->ForceM(0U, true, true);
-    qReg1->Dispose(0U, 1U, 1U);
-    q[1] = std::make_shared<QBdtQStabilizerNode>(amp1, qReg1);
-    q[1]->Prune();
+    if (amp1 == ZERO_CMPLX) {
+        q[1] = std::make_shared<QBdtQStabilizerNode>();
+    } else {
+        QStabilizerPtr qReg1 = std::dynamic_pointer_cast<QStabilizer>(qReg->Clone());
+        qReg1->ForceM(0U, true, true);
+        qReg1->Dispose(0U, 1U, 1U);
+        q[1] = std::make_shared<QBdtQStabilizerNode>(amp1, qReg1);
+        q[1]->Prune();
+    }
 
     QBdtNodePtr toRet = std::make_shared<QBdtNode>(scale, q);
     toRet->Prune();

@@ -589,25 +589,26 @@ void QBdt::ApplySingle(const complex* mtrx, bitLenInt target)
                 isFail = true;
                 return (bitCapInt)(qPower - ONE_BCI);
             }
+
             for (; j < target; j++) {
-                if (!leaf->branches[0]) {
-                    leaf = leaf->PopSpecial();
-                    parent->branches[SelectBit(i, target - (j + 2U))] = leaf;
-                } else {
-                    leaf->Branch();
-                }
+                leaf = leaf->PopSpecial();
+                parent->branches[SelectBit(i, target - j)] = leaf;
+
                 parent = leaf;
                 leaf = leaf->branches[SelectBit(i, target - (j + 1U))];
+
                 if (IS_NORM_0(leaf->scale)) {
                     // WARNING: Mutates loop control variable!
                     return (bitCapInt)(pow2(target - (j + 1U)) - ONE_BCI);
                 }
             }
+
 #if ENABLE_COMPLEX_X2
             leaf->Apply2x2(mtrxCol1, mtrxCol2, qubitCount - target);
 #else
             leaf->Apply2x2(mtrx, qubitCount - target);
 #endif
+
             return (bitCapInt)0U;
         }
         qis[qi] = j;
@@ -724,10 +725,10 @@ void QBdt::ApplyControlledSingle(
         std::vector<bitLenInt> ketControlsVec;
         for (bitLenInt c = (controlLen - 1U); c >= 0U; c--) {
             const bitLenInt control = controlVec[c];
-            if (control <= j) {
+            if (control < j) {
                 break;
             }
-            ketControlsVec.push_back(j - (control + 1U));
+            ketControlsVec.push_back(control - j);
         }
         std::unique_ptr<bitLenInt[]> sControls = std::unique_ptr<bitLenInt[]>(new bitLenInt[ketControlsVec.size()]);
         std::copy(ketControlsVec.begin(), ketControlsVec.end(), sControls.get());
@@ -745,25 +746,31 @@ void QBdt::ApplyControlledSingle(
                 isFail = true;
                 return (bitCapInt)(qPower - ONE_BCI);
             }
+
             for (; j < target; j++) {
-                if (!leaf->branches[0]) {
-                    leaf = leaf->PopSpecial();
-                    parent->branches[SelectBit(i, target - (j + 2U))] = leaf;
-                } else {
-                    leaf->Branch();
+                leaf = leaf->PopSpecial();
+                parent->branches[SelectBit(i, target - j)] = leaf;
+
+                const bitCapInt qbPow = pow2(j);
+                if ((qbPow & controlMask) && ((i & controlMask) & (isAnti ? qbPow : 0U))) {
+                    return (bitCapInt)(qbPow - ONE_BCI);
                 }
+
                 parent = leaf;
                 leaf = leaf->branches[SelectBit(i, target - (j + 1U))];
+
                 if (IS_NORM_0(leaf->scale)) {
                     // WARNING: Mutates loop control variable!
                     return (bitCapInt)(pow2(target - (j + 1U)) - ONE_BCI);
                 }
             }
+
 #if ENABLE_COMPLEX_X2
             leaf->Apply2x2(mtrxCol1, mtrxCol2, qubitCount - target);
 #else
             leaf->Apply2x2(mtrx, qubitCount - target);
 #endif
+
             return (bitCapInt)0U;
         }
         qis[qi] = j;
@@ -789,10 +796,10 @@ void QBdt::ApplyControlledSingle(
         std::vector<bitLenInt> ketControlsVec;
         for (bitLenInt c = (controlLen - 1U); c >= 0U; c--) {
             const bitLenInt control = controlVec[c];
-            if (control <= it->second) {
+            if (control < it->second) {
                 break;
             }
-            ketControlsVec.push_back(it->second - (control + 1U));
+            ketControlsVec.push_back(control - it->second);
         }
         std::unique_ptr<bitLenInt[]> sControls = std::unique_ptr<bitLenInt[]>(new bitLenInt[ketControlsVec.size()]);
         std::copy(ketControlsVec.begin(), ketControlsVec.end(), sControls.get());

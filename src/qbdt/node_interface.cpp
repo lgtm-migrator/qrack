@@ -17,6 +17,7 @@
 #include "qbdt_node_interface.hpp"
 
 #define IS_SAME_AMP(a, b) (norm((a) - (b)) <= (REAL1_EPSILON * REAL1_EPSILON))
+#define IS_NORM_0(a) (norm(a) <= FP_NORM_EPSILON)
 
 namespace Qrack {
 
@@ -57,17 +58,28 @@ bool QBdtNodeInterface::isEqual(QBdtNodeInterfacePtr r)
         return false;
     }
 
+    const bool isMismatchedSpecial = branches[0] && !r->branches[0];
+    if (isMismatchedSpecial) {
+        // "this" node is not "special," but "r" is.
+        r = r->ShallowClone();
+        r->PopSpecial();
+    }
+
     if (branches[0] != r->branches[0]) {
         return false;
     }
 
-    branches[0] = r->branches[0];
+    if (!isMismatchedSpecial) {
+        branches[0] = r->branches[0];
+    }
 
     if (branches[1] != r->branches[1]) {
         return false;
     }
 
-    branches[1] = r->branches[1];
+    if (!isMismatchedSpecial) {
+        branches[1] = r->branches[1];
+    }
 
     return true;
 }
@@ -80,6 +92,12 @@ bool QBdtNodeInterface::isEqualUnder(QBdtNodeInterfacePtr r)
 
     if (this == r.get()) {
         return true;
+    }
+
+    if (branches[0] && !r->branches[0] && !IS_NORM_0(r->scale)) {
+        // "this" node is not "special," but "r" is.
+        r = r->ShallowClone();
+        r->PopSpecial();
     }
 
     if (branches[0] != r->branches[0]) {
