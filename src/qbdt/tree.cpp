@@ -326,6 +326,10 @@ real1_f QBdt::Prob(bitLenInt qubit)
     if (stateVec) {
         return stateVec->Prob(qubit);
     }
+    if (!root->branches[0]) {
+        return NODE_TO_QINTERFACE(root)->Prob(qubit);
+    }
+
     const bitCapInt qPower = pow2(qubit);
 
     std::map<QInterfacePtr, real1> qiProbs;
@@ -347,18 +351,17 @@ real1_f QBdt::Prob(bitLenInt qubit)
             continue;
         }
 
-        if ((!j && !root->branches[0]) || (j < qubit)) {
-            // Phase effects don't matter, for probability expectation.
-            QInterfacePtr qi = NODE_TO_QINTERFACE(leaf);
-            if (qiProbs.find(qi) == qiProbs.end()) {
-                qiProbs[qi] = sqrt(NODE_TO_QINTERFACE(leaf)->Prob(qubit - j));
-            }
-            oneChance += norm(scale * qiProbs[qi]);
-
+        if ((j == qubit) && leaf->branches[1]) {
+            oneChance += norm(scale * leaf->branches[1]->scale);
             continue;
         }
 
-        oneChance += norm(scale * leaf->branches[1]->scale);
+        // Phase effects don't matter, for probability expectation.
+        QInterfacePtr qi = NODE_TO_QINTERFACE(leaf);
+        if (qiProbs.find(qi) == qiProbs.end()) {
+            qiProbs[qi] = sqrt(NODE_TO_QINTERFACE(leaf)->Prob(qubit - j));
+        }
+        oneChance += norm(scale * qiProbs[qi]);
     }
 
     return clampProb(oneChance);
@@ -392,6 +395,9 @@ bool QBdt::ForceM(bitLenInt qubit, bool result, bool doForce, bool doApply)
 {
     if (stateVec) {
         return stateVec->ForceM(qubit, result, doForce, doApply);
+    }
+    if (!root->branches[0]) {
+        return NODE_TO_QINTERFACE(root)->ForceM(qubit, result, doForce, doApply);
     }
 
     const real1_f oneChance = Prob(qubit);
@@ -427,7 +433,7 @@ bool QBdt::ForceM(bitLenInt qubit, bool result, bool doForce, bool doApply)
             continue;
         }
 
-        if ((!j && !root->branches[0]) || (j < qubit)) {
+        if ((j < qubit) || !leaf->branches[1]) {
             QInterfacePtr qi = NODE_TO_QINTERFACE(leaf);
             if (qis.find(qi) == qis.end()) {
                 NODE_TO_QINTERFACE(leaf)->ForceM(qubit - j, result, false, true);

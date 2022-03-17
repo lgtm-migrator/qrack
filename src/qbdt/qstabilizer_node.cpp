@@ -133,8 +133,8 @@ QBdtNodeInterfacePtr QBdtQStabilizerNode::PopSpecial()
     q[0]->Prune();
 
     QStabilizerPtr qReg1 = std::dynamic_pointer_cast<QStabilizer>(qReg->Clone());
-    qReg0->ForceM(0U, true, true);
-    qReg0->Dispose(0U, 1U, 1U);
+    qReg1->ForceM(0U, true, true);
+    qReg1->Dispose(0U, 1U, 1U);
     q[1] = std::make_shared<QBdtQStabilizerNode>(amp1, qReg1);
     q[1]->Prune();
 
