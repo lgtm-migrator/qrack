@@ -702,7 +702,7 @@ void QBdt::ApplyControlledSingle(
             }
 
             const bitCapInt qbPow = pow2(j);
-            if ((qbPow & controlMask) && ((i & controlMask) & (isAnti ? qbPow : 0U))) {
+            if ((qbPow & controlMask) && ((i & qbPow) == (isAnti ? qbPow : 0U))) {
                 return (bitCapInt)(qbPow - ONE_BCI);
             }
             leaf->Branch();
@@ -755,7 +755,7 @@ void QBdt::ApplyControlledSingle(
                 parent->branches[SelectBit(i, target - j)] = leaf;
 
                 const bitCapInt qbPow = pow2(j);
-                if ((qbPow & controlMask) && ((i & controlMask) & (isAnti ? qbPow : 0U))) {
+                if ((qbPow & controlMask) && ((i & qbPow) == (isAnti ? qbPow : 0U))) {
                     return (bitCapInt)(qbPow - ONE_BCI);
                 }
 
