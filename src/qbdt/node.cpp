@@ -313,7 +313,22 @@ void QBdtNode::PushStateVector(const complex2& mtrxCol1, const complex2& mtrxCol
         return;
     }
 
-    const bool isSame = b0->isEqualUnder(b1);
+    bool isSame = b0->isEqualUnder(b1);
+    if (!isSame && depth) {
+        const bool isSpecial0 = !b0->branches[0];
+        if (isSpecial0) {
+            b0 = b0->PopSpecial();
+        }
+
+        const bool isSpecial1 = !b1->branches[0];
+        if (isSpecial1) {
+            b1 = b1->PopSpecial();
+        }
+
+        if (isSpecial0 || isSpecial1) {
+            isSame = b0->isEqualUnder(b1);
+        }
+    }
     if (isSame) {
         complex2 qubit(b0->scale, b1->scale);
         qubit.c2 = matrixMul(mtrxCol1.c2, mtrxCol2.c2, qubit.c2);
@@ -331,13 +346,6 @@ void QBdtNode::PushStateVector(const complex2& mtrxCol1, const complex2& mtrxCol
 
     b0->Branch();
     b1->Branch();
-
-    if (!b0->branches[0]) {
-        b0 = b0->PopSpecial();
-    }
-    if (!b1->branches[0]) {
-        b1 = b1->PopSpecial();
-    }
 
     b0->branches[0]->scale *= b0->scale;
     b0->branches[1]->scale *= b0->scale;
