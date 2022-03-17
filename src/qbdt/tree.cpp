@@ -553,52 +553,54 @@ void QBdt::ApplySingle(const complex* mtrx, bitLenInt target)
             return (bitCapInt)0U;
         }
 
-        if ((!j && !root->branches[0]) || (j < target)) {
-            leaf->Branch();
-            QInterfacePtr qi = NODE_TO_QINTERFACE(leaf);
-            const bitLenInt sTarget = target - j;
-            try {
-                qi->Mtrx(mtrx, sTarget);
-            } catch (const std::domain_error&) {
-                if (!isCannotFail) {
-                    isFail = true;
-                    return (bitCapInt)(qPower - ONE_BCI);
-                }
-                for (; j < target; j++) {
-                    if (!leaf->branches[0]) {
-                        leaf = leaf->PopSpecial();
-                        if (!j) {
-                            root = leaf;
-                        } else {
-                            parent->branches[SelectBit(i, target - (j + 2U))] = leaf;
-                        }
-                    } else {
-                        leaf->Branch();
-                    }
-                    parent = leaf;
-                    leaf = leaf->branches[SelectBit(i, target - (j + 1U))];
-                    if (IS_NORM_0(leaf->scale)) {
-                        // WARNING: Mutates loop control variable!
-                        return (bitCapInt)(pow2(target - (j + 1U)) - ONE_BCI);
-                    }
-                }
-#if ENABLE_COMPLEX_X2
-                leaf->Apply2x2(mtrxCol1, mtrxCol2, qubitCount - target);
-#else
-                leaf->Apply2x2(mtrx, qubitCount - target);
-#endif
-            }
-            qis[qi] = j;
-        } else {
+        if ((j == target) && (j || root->branches[0])) {
             isCannotFail = true;
 #if ENABLE_COMPLEX_X2
             leaf->Apply2x2(mtrxCol1, mtrxCol2, qubitCount - target);
 #else
             leaf->Apply2x2(mtrx, qubitCount - target);
 #endif
+            return (bitCapInt)0U;
         }
 
-        return (bitCapInt)0U;
+        leaf->Branch();
+        QInterfacePtr qi = NODE_TO_QINTERFACE(leaf);
+        const bitLenInt sTarget = target - j;
+        try {
+            qi->Mtrx(mtrx, sTarget);
+        } catch (const std::domain_error&) {
+            if (!isCannotFail) {
+                isFail = true;
+                return (bitCapInt)(qPower - ONE_BCI);
+            }
+            for (; j < target; j++) {
+                if (!leaf->branches[0]) {
+                    leaf = leaf->PopSpecial();
+                    if (!j) {
+                        root = leaf;
+                    } else {
+                        parent->branches[SelectBit(i, target - (j + 2U))] = leaf;
+                    }
+                } else {
+                    leaf->Branch();
+                }
+                parent = leaf;
+                leaf = leaf->branches[SelectBit(i, target - (j + 1U))];
+                if (IS_NORM_0(leaf->scale)) {
+                    // WARNING: Mutates loop control variable!
+                    return (bitCapInt)(pow2(target - (j + 1U)) - ONE_BCI);
+                }
+            }
+#if ENABLE_COMPLEX_X2
+            leaf->Apply2x2(mtrxCol1, mtrxCol2, qubitCount - target);
+#else
+            leaf->Apply2x2(mtrx, qubitCount - target);
+#endif
+            return (bitCapInt)0U;
+        }
+        qis[qi] = j;
+
+        return (bitCapInt)(pow2(target - j) - ONE_BCI);
     });
 
     if (!isFail) {
@@ -681,67 +683,69 @@ void QBdt::ApplyControlledSingle(
             return (bitCapInt)0U;
         }
 
-        if ((!j && !root->branches[0]) || (j < target)) {
-            const bitLenInt sTarget = target - qubitCount;
-            std::vector<bitLenInt> ketControlsVec;
-            for (bitLenInt c = (controlLen - 1U); c >= 0U; c--) {
-                const bitLenInt control = controlVec[c];
-                if (control <= j) {
-                    break;
-                }
-                ketControlsVec.push_back(j - (control + 1U));
-            }
-            std::unique_ptr<bitLenInt[]> sControls = std::unique_ptr<bitLenInt[]>(new bitLenInt[ketControlsVec.size()]);
-            std::copy(ketControlsVec.begin(), ketControlsVec.end(), sControls.get());
-
-            leaf->Branch();
-            QInterfacePtr qi = NODE_TO_QINTERFACE(leaf);
-            try {
-                if (isAnti) {
-                    qi->MACMtrx(sControls.get(), ketControlsVec.size(), mtrx, sTarget);
-                } else {
-                    qi->MCMtrx(sControls.get(), ketControlsVec.size(), mtrx, sTarget);
-                }
-            } catch (const std::domain_error&) {
-                if (!isCannotFail) {
-                    isFail = true;
-                    return (bitCapInt)(qPower - ONE_BCI);
-                }
-                for (; j < target; j++) {
-                    if (!leaf->branches[0]) {
-                        leaf = leaf->PopSpecial();
-                        if (!j) {
-                            root = leaf;
-                        } else {
-                            parent->branches[SelectBit(i, target - (j + 2U))] = leaf;
-                        }
-                    } else {
-                        leaf->Branch();
-                    }
-                    parent = leaf;
-                    leaf = leaf->branches[SelectBit(i, target - (j + 1U))];
-                    if (IS_NORM_0(leaf->scale)) {
-                        // WARNING: Mutates loop control variable!
-                        return (bitCapInt)(pow2(target - (j + 1U)) - ONE_BCI);
-                    }
-                }
-#if ENABLE_COMPLEX_X2
-                leaf->Apply2x2(mtrxCol1, mtrxCol2, qubitCount - target);
-#else
-                leaf->Apply2x2(mtrx, qubitCount - target);
-#endif
-            }
-            qis[qi] = j;
-        } else {
+        if ((j == target) && (j || root->branches[0])) {
             isCannotFail = true;
 #if ENABLE_COMPLEX_X2
             leaf->Apply2x2(mtrxCol1, mtrxCol2, qubitCount - target);
 #else
             leaf->Apply2x2(mtrx, qubitCount - target);
 #endif
+            return (bitCapInt)0U;
         }
 
-        return (bitCapInt)0U;
+        const bitLenInt sTarget = target - qubitCount;
+        std::vector<bitLenInt> ketControlsVec;
+        for (bitLenInt c = (controlLen - 1U); c >= 0U; c--) {
+            const bitLenInt control = controlVec[c];
+            if (control <= j) {
+                break;
+            }
+            ketControlsVec.push_back(j - (control + 1U));
+        }
+        std::unique_ptr<bitLenInt[]> sControls = std::unique_ptr<bitLenInt[]>(new bitLenInt[ketControlsVec.size()]);
+        std::copy(ketControlsVec.begin(), ketControlsVec.end(), sControls.get());
+
+        leaf->Branch();
+        QInterfacePtr qi = NODE_TO_QINTERFACE(leaf);
+        try {
+            if (isAnti) {
+                qi->MACMtrx(sControls.get(), ketControlsVec.size(), mtrx, sTarget);
+            } else {
+                qi->MCMtrx(sControls.get(), ketControlsVec.size(), mtrx, sTarget);
+            }
+        } catch (const std::domain_error&) {
+            if (!isCannotFail) {
+                isFail = true;
+                return (bitCapInt)(qPower - ONE_BCI);
+            }
+            for (; j < target; j++) {
+                if (!leaf->branches[0]) {
+                    leaf = leaf->PopSpecial();
+                    if (!j) {
+                        root = leaf;
+                    } else {
+                        parent->branches[SelectBit(i, target - (j + 2U))] = leaf;
+                    }
+                } else {
+                    leaf->Branch();
+                }
+                parent = leaf;
+                leaf = leaf->branches[SelectBit(i, target - (j + 1U))];
+                if (IS_NORM_0(leaf->scale)) {
+                    // WARNING: Mutates loop control variable!
+                    return (bitCapInt)(pow2(target - (j + 1U)) - ONE_BCI);
+                }
+            }
+#if ENABLE_COMPLEX_X2
+            leaf->Apply2x2(mtrxCol1, mtrxCol2, qubitCount - target);
+#else
+            leaf->Apply2x2(mtrx, qubitCount - target);
+#endif
+            return (bitCapInt)0U;
+        }
+        qis[qi] = j;
+
+        return (bitCapInt)(pow2(target - j) - ONE_BCI);
     });
 
     if (!isFail) {

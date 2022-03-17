@@ -138,7 +138,10 @@ QBdtNodeInterfacePtr QBdtQStabilizerNode::PopSpecial()
     q[1] = std::make_shared<QBdtQStabilizerNode>(amp1, qReg1);
     q[1]->Prune();
 
-    return std::make_shared<QBdtNode>(scale, q);
+    QBdtNodePtr toRet = std::make_shared<QBdtNode>(scale, q);
+    toRet->Prune();
+
+    return toRet;
 }
 
 void QBdtQStabilizerNode::Normalize(bitLenInt depth)
