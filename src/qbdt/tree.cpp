@@ -17,6 +17,8 @@
 #include "qbdt_node.hpp"
 #include "qfactory.hpp"
 
+#include <iostream>
+
 namespace Qrack {
 
 QBdt::QBdt(std::vector<QInterfaceEngine> eng, bitLenInt qBitCount, bitCapInt initState, qrack_rand_gen_ptr rgp,
@@ -65,8 +67,7 @@ void QBdt::FallbackMCMtrx(
     for (bitCapInt i = 0; i < gatePower; i++) {
         QBdtNodeInterfacePtr leaf = root;
         QBdtNodeInterfacePtr parent = NULL;
-        bitLenInt j;
-        for (j = 0; j < gateQubitCount; j++) {
+        for (bitLenInt j = 0; j < gateQubitCount; j++) {
             if (IS_NORM_0(leaf->scale)) {
                 break;
             }
@@ -94,7 +95,7 @@ void QBdt::FallbackMCMtrx(
 
     Swap(controlLen, target);
     for (bitLenInt i = 0U; i < controlLen; i++) {
-        Swap(controlLen - (i + 1U), controls[controlLen - (i + 1U)]);
+        Swap(i, controls[i]);
     }
 }
 
@@ -602,6 +603,8 @@ void QBdt::ApplySingle(const complex* mtrx, bitLenInt target)
                     return (bitCapInt)(pow2(target - (j + 1U)) - ONE_BCI);
                 }
             }
+            leaf = leaf->PopSpecial();
+            parent->branches[SelectBit(i, 0)] = leaf;
 
 #if ENABLE_COMPLEX_X2
             leaf->Apply2x2(mtrxCol1, mtrxCol2, qubitCount - target);
@@ -721,12 +724,12 @@ void QBdt::ApplyControlledSingle(
             return (bitCapInt)0U;
         }
 
-        const bitLenInt sTarget = target - qubitCount;
+        const bitLenInt sTarget = target - j;
         std::vector<bitLenInt> ketControlsVec;
-        for (bitLenInt c = (controlLen - 1U); c >= 0U; c--) {
+        for (bitLenInt c = 0U; c < controlLen; c++) {
             const bitLenInt control = controlVec[c];
             if (control < j) {
-                break;
+                continue;
             }
             ketControlsVec.push_back(control - j);
         }
@@ -764,6 +767,8 @@ void QBdt::ApplyControlledSingle(
                     return (bitCapInt)(pow2(target - (j + 1U)) - ONE_BCI);
                 }
             }
+            leaf = leaf->PopSpecial();
+            parent->branches[SelectBit(i, 0)] = leaf;
 
 #if ENABLE_COMPLEX_X2
             leaf->Apply2x2(mtrxCol1, mtrxCol2, qubitCount - target);
@@ -794,10 +799,10 @@ void QBdt::ApplyControlledSingle(
     std::map<QInterfacePtr, bitLenInt>::iterator it = qis.begin();
     while (it != qis.end()) {
         std::vector<bitLenInt> ketControlsVec;
-        for (bitLenInt c = (controlLen - 1U); c >= 0U; c--) {
+        for (bitLenInt c = 0U; c < controlLen; c++) {
             const bitLenInt control = controlVec[c];
             if (control < it->second) {
-                break;
+                continue;
             }
             ketControlsVec.push_back(control - it->second);
         }
