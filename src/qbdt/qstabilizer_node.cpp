@@ -86,11 +86,11 @@ QBdtNodeInterfacePtr QBdtQStabilizerNode::PopSpecial()
     bitCapInt perm;
     for (perm = 0U; perm < qReg->GetMaxQPower(); perm++) {
         amp0 = qReg->GetAmplitude(perm);
-        if (!IS_NORM_0(amp)) {
+        if (!IS_NORM_0(amp0)) {
             break;
         }
     }
-    const bool isAmp1 = perm & 1U;
+    const bool isAmp1 = (bool)(perm & 1U);
     complex phaseFac = ONE_CMPLX;
     complex amp1;
     if (isAmp1) {
@@ -101,7 +101,7 @@ QBdtNodeInterfacePtr QBdtQStabilizerNode::PopSpecial()
         phaseFac = amp1 / amp0;
     }
 
-    QBdtQStabilizerNode q[2];
+    QBdtNodeInterfacePtr q[2];
 
     QStabilizerPtr qReg0 = std::dynamic_pointer_cast<QStabilizer>(qReg->Clone());
     qReg0->ForceM(0U, false, true);
@@ -113,7 +113,7 @@ QBdtNodeInterfacePtr QBdtQStabilizerNode::PopSpecial()
     qReg0->Dispose(0U, 1U, 1U);
     q[0] = std::make_shared<QBdtQStabilizerNode>(amp1, qReg1);
 
-    return QBdtNodePtr(scale, q);
+    return std::make_shared<QBdtNode>(scale, q);
 }
 
 void QBdtQStabilizerNode::Normalize(bitLenInt depth)

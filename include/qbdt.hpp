@@ -44,7 +44,7 @@ protected:
         const complex* mtrx, const bitLenInt* controls, bitLenInt controlLen, bitLenInt target, bool isAnti);
 
     QInterfacePtr MakeQInterface(bitLenInt qbCount);
-    QStabilizerPtr MakeQStabilizer(bitLenInt qbCount, bitLenInt perm);
+    QStabilizerPtr MakeQStabilizer(bitLenInt qbCount, bitCapInt perm);
     QInterfacePtr MakeTempStateVector()
     {
         QInterfacePtr copyPtr = MakeQInterface(qubitCount);
@@ -63,7 +63,6 @@ protected:
         stateVec = MakeQInterface(qubitCount);
         GetQuantumState(stateVec);
         root = NULL;
-        SetQubitCount(qubitCount, qubitCount);
     }
     void ResetStateVector()
     {
@@ -71,7 +70,6 @@ protected:
             return;
         }
 
-        SetQubitCount(qubitCount, 0U);
         SetQuantumState(stateVec);
     }
 

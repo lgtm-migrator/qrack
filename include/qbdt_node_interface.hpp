@@ -90,8 +90,8 @@ public:
 
     virtual QBdtNodeInterfacePtr PopSpecial()
     {
-        std::out_of_range("QBdtNodeInterface::PopSpecial() not implemented! (Likely, a non-terminal branch was null "
-                          "with nonzero parent amplitude.)");
+        throw std::out_of_range("QBdtNodeInterface::PopSpecial() not implemented! (Likely, a non-terminal branch was "
+                                "null with nonzero parent amplitude.)");
     }
 
     virtual QBdtNodeInterfacePtr ShallowClone() = 0;
