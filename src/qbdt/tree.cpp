@@ -553,7 +553,7 @@ void QBdt::ApplySingle(const complex* mtrx, bitLenInt target)
             return (bitCapInt)0U;
         }
 
-        if (j < target) {
+        if ((!j && target) || (j < target)) {
             leaf->Branch();
             QInterfacePtr qi = NODE_TO_QINTERFACE(leaf);
             const bitLenInt sTarget = target - j;
@@ -681,7 +681,7 @@ void QBdt::ApplyControlledSingle(
             return (bitCapInt)0U;
         }
 
-        if (j < target) {
+        if ((!j && target) || (j < target)) {
             const bitLenInt sTarget = target - qubitCount;
             std::vector<bitLenInt> ketControlsVec;
             for (bitLenInt c = (controlLen - 1U); c >= 0U; c--) {

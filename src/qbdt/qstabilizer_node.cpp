@@ -74,7 +74,7 @@ bool QBdtQStabilizerNode::isEqualUnder(QBdtNodeInterfacePtr r)
     if (IS_NORM_0(scale)) {
         return IS_NORM_0(r->scale);
     }
-    
+
     if (r->branches[0]) {
         // "this" node is "special," but "r" is not.
 
