@@ -157,10 +157,10 @@ QBdtNodeInterfacePtr QBdtQStabilizerNode::PopSpecial()
 
     // Bob finishes teleportation based on Alice's measurement.
     complex amps[2] = { SQRT1_2_R1, SQRT1_2_R1 };
-    if (m0) {
+    if (m1) {
         amps[1] *= -ONE_CMPLX;
     }
-    if (m1) {
+    if (m0) {
         std::swap(amps[0], amps[1]);
     }
 

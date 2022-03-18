@@ -474,7 +474,6 @@ bitCapInt QBdt::MAll()
 
     bitCapInt result = 0;
     QBdtNodeInterfacePtr leaf = root;
-    QBdtNodeInterfacePtr parent = NULL;
     bool bitResult = false;
     for (bitLenInt i = 0; i < qubitCount; i++) {
         if (!leaf->branches[0]) {
@@ -490,8 +489,6 @@ bitCapInt QBdt::MAll()
         } else {
             bitResult = (Rand() <= oneChance);
         }
-
-        parent = leaf;
 
         if (bitResult) {
             leaf->branches[0]->SetZero();
