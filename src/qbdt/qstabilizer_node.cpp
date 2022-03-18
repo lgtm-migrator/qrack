@@ -108,15 +108,22 @@ QBdtNodeInterfacePtr QBdtQStabilizerNode::PopSpecial()
     q[0] = std::dynamic_pointer_cast<QStabilizer>(qReg->Clone());
 
     // First, let's divert all separable cases, for simplicity.
-    const bool isY = q[0]->IsSeparableY(0);
-    if (isY) {
-        q[0]->IS(0);
-    }
-    const bool isX = q[0]->IsSeparableX(0);
-    if (isX) {
+    bool isSeparable = q[0]->IsSeparableZ(0);
+    bool isX, isY;
+    if (!isSeparable) {
         q[0]->H(0);
+        isX = q[0]->IsSeparableZ(0);
+        isSeparable |= isX;
     }
-    if (q[0]->IsSeparableZ(0)) {
+    if (!isSeparable) {
+        q[0]->S(0);
+        isY = q[0]->IsSeparableZ(0);
+        isSeparable |= isY;
+    }
+    if (!isSeparable) {
+        q[0]->IS(0);
+        q[0]->H(0);
+    } else {
         // If the bit is individually separable, we end up here.
 
         // It's in Z-basis eigenstate. We can measure without destroying any information.
