@@ -132,6 +132,16 @@ public:
         return clone;
     }
 
+    void AddQbAt0()
+    {
+        Finish();
+
+        QStabilizerPtr nQb = std::make_shared<QStabilizer>(1U, 0, rand_generator, CMPLX_DEFAULT_ARG, false,
+            randGlobalPhase, false, -1, hardware_rand_generator != NULL);
+
+        Compose(nQb, 0U);
+    }
+
     virtual ~QStabilizer() { Dump(); }
 
     virtual bool isClifford() { return true; };

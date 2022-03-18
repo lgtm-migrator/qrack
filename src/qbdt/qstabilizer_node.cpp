@@ -100,53 +100,59 @@ bool QBdtQStabilizerNode::isEqualUnder(QBdtNodeInterfacePtr r)
 
 QBdtNodeInterfacePtr QBdtQStabilizerNode::PopSpecial()
 {
-    // NOTE: Stabilizer amplitudes are all-or-nothing equal superpositions in Qrack API and should not need rounding.
+    // NOTE: This is basically the quantum teleportation algorithm, (with forced measurement results for total
+    // simplicity, since this is simulated).
 
-    const bitCapInt maxQPower = qReg->GetMaxQPower();
-    complex amp0;
-    bitCapInt perm;
-    for (perm = 0U; perm < maxQPower; perm++) {
-        amp0 = qReg->GetAmplitude(perm);
-        if (amp0 != ZERO_CMPLX) {
-            break;
-        }
-    }
-    const bool isAmp1 = (bool)(perm & 1U);
-    complex amp1;
-    if (isAmp1) {
-        amp1 = amp0;
-        amp0 = ZERO_CMPLX;
-    } else {
-        // 0 index bit is definitely 0, so +1.
-        amp1 = qReg->GetAmplitude(perm | 1U);
-    }
-    const real1 len = (real1)sqrt(norm(amp0) + norm(amp1));
-    amp0 /= len;
-    amp1 /= len;
+    QStabilizerPtr q[2];
 
-    QBdtNodeInterfacePtr q[2];
+    // We clone the current stabilizer state.
+    q[0] = std::dynamic_pointer_cast<QStabilizer>(qReg->Clone());
 
-    if (amp0 == ZERO_CMPLX) {
-        q[0] = std::make_shared<QBdtQStabilizerNode>();
-    } else {
-        QStabilizerPtr qReg0 = std::dynamic_pointer_cast<QStabilizer>(qReg->Clone());
-        qReg0->ForceM(0U, false);
-        qReg0->Dispose(0U, 1U, 0U);
-        q[0] = std::make_shared<QBdtQStabilizerNode>(amp0, qReg0);
-        q[0]->Prune();
-    }
+    // We add a qubit, set to |0>.
+    q[0]->AddQbAt0();
 
-    if (amp1 == ZERO_CMPLX) {
-        q[1] = std::make_shared<QBdtQStabilizerNode>();
-    } else {
-        QStabilizerPtr qReg1 = std::dynamic_pointer_cast<QStabilizer>(qReg->Clone());
-        qReg1->ForceM(0U, true);
-        qReg1->Dispose(0U, 1U, 1U);
-        q[1] = std::make_shared<QBdtQStabilizerNode>(amp1, qReg1);
-        q[1]->Prune();
-    }
+    // We set the new qubit in superposition.
+    q[0]->H(0);
 
-    QBdtNodePtr toRet = std::make_shared<QBdtNode>(scale, q);
+    // We clone the NEW CLONE, with the superposed bit.
+    q[1] = std::dynamic_pointer_cast<QStabilizer>(q[0]->Clone());
+
+    // If we act an X gate just on the |1> permutation new branch, it's a CNOT in the QBdt tree.
+    q[1]->X(0);
+
+    // We have a Bell pair shared half-and-half across the simulation types.
+    // (By common convention, stabilizer is "Alice" and QBdt is "Bob.")
+
+    // Alice entangles her bit with the Bell pair.
+    q[0]->CNOT(1, 0);
+    q[1]->CNOT(1, 0);
+
+    // At this point, Alice measures both her bits. If both bits are zero, Bob already has the teleported state.
+
+    // If we force 0 measurement of the Bell pair half...
+    q[0]->ForceM(0U, false);
+    q[1]->ForceM(0U, false);
+
+    // And we force 0 measurement of the original bit...
+    q[0]->ForceM(1U, false);
+    q[1]->ForceM(1U, false);
+
+    // ...Bob already has the teleported qubit. ;-)
+
+    // Clean up the measured bits.
+    q[0]->Dispose(0U, 2U, 0U);
+    q[1]->Dispose(0U, 2U, 0U);
+
+    // Initialize and prune the sub-tree, and send it back up the caller.
+
+    QBdtNodeInterfacePtr qn[2];
+    qn[0] = std::make_shared<QBdtQStabilizerNode>(ONE_CMPLX, q[0]);
+    qn[1] = std::make_shared<QBdtQStabilizerNode>(ONE_CMPLX, q[1]);
+
+    qn[0]->Prune();
+    qn[1]->Prune();
+
+    QBdtNodePtr toRet = std::make_shared<QBdtNode>(scale, qn);
     toRet->Prune();
 
     return toRet;
