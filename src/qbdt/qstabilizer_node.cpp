@@ -181,26 +181,24 @@ QBdtNodeInterfacePtr QBdtQStabilizerNode::PopSpecial()
     q[0]->Dispose(0U, 2U, 0U);
     q[1]->Dispose(0U, 2U, 0U);
 
-    // Bob's Bell pair half starts in maximal superposition, without phase.
-    complex amps[2] = { SQRT1_2_R1, SQRT1_2_R1 };
-    if (m0) {
-        // This acts an X gate on Bob's bit.
-        // Bob's tree node amplitudes are unchanged, but the branches are swapped.
-        q[0].swap(q[1]);
-    }
-    if (m1) {
-        // This acts a Z gate on Bob's bit.
-        amps[1] *= -ONE_CMPLX;
-    }
-
-    // Initialize and prune the sub-tree, and send it back up the caller.
-    qn[0] = std::make_shared<QBdtQStabilizerNode>(amps[0], q[0]);
-    qn[1] = std::make_shared<QBdtQStabilizerNode>(amps[1], q[1]);
+    // Initialize and prune the sub-tree.
+    qn[0] = std::make_shared<QBdtQStabilizerNode>(SQRT1_2_R1, q[0]);
+    qn[1] = std::make_shared<QBdtQStabilizerNode>(SQRT1_2_R1, q[1]);
 
     qn[0]->Prune();
     qn[1]->Prune();
 
     QBdtNodePtr toRet = std::make_shared<QBdtNode>(scale, qn);
+
+    if (m0) {
+        // This acts an X gate on Bob's bit.
+        toRet->branches[0].swap(toRet->branches[1]);
+    }
+    if (m1) {
+        // This acts a Z gate on Bob's bit.
+        toRet->branches[1]->scale *= -ONE_CMPLX;
+    }
+
     toRet->Prune();
 
     return toRet;
