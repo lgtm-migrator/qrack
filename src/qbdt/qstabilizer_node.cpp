@@ -107,6 +107,20 @@ QBdtNodeInterfacePtr QBdtQStabilizerNode::PopSpecial()
     // We clone the current stabilizer state.
     q[0] = std::dynamic_pointer_cast<QStabilizer>(qReg->Clone());
 
+    // If there's only one stabilizer qubit, just convert it to a ket.
+    if (q[0]->GetQubitCount() == 1U) {
+        complex amps[2];
+        q[0]->GetQuantumState(amps);
+
+        qn[0] = std::make_shared<QBdtNode>(amps[0]);
+        qn[1] = std::make_shared<QBdtNode>(amps[1]);
+
+        QBdtNodePtr toRet = std::make_shared<QBdtNode>(scale, qn);
+        toRet->Prune();
+
+        return toRet;
+    }
+
     // First, let's divert Z-basis eigenstates, for simplicity.
     const bool isZ = q[0]->IsSeparableZ(0);
     if (isZ) {
@@ -154,9 +168,6 @@ QBdtNodeInterfacePtr QBdtQStabilizerNode::PopSpecial()
     q[1]->H(1);
 
     // At this point, Alice measures both her bits.
-    // Since we diverted all separable cases above, we know her original bit was in a maximally mixed state.
-    // Hence, we can "force the measurement," since we're simulating.
-    // If Alice measures both bits to be 0, Bob already has the teleported state.
 
     // We measure Alice's Bell pair half...
     const bool m0 = q[0]->M(0);
@@ -183,8 +194,8 @@ QBdtNodeInterfacePtr QBdtQStabilizerNode::PopSpecial()
     }
 
     // Initialize and prune the sub-tree, and send it back up the caller.
-    qn[0] = std::make_shared<QBdtQStabilizerNode>(SQRT1_2_R1, q[0]);
-    qn[1] = std::make_shared<QBdtQStabilizerNode>(SQRT1_2_R1, q[1]);
+    qn[0] = std::make_shared<QBdtQStabilizerNode>(amps[0], q[0]);
+    qn[1] = std::make_shared<QBdtQStabilizerNode>(amps[1], q[1]);
 
     qn[0]->Prune();
     qn[1]->Prune();
