@@ -678,6 +678,7 @@ void QBdt::ApplyControlledSingle(
         controlMask |= pow2(target - (controlVec[c] + 1U));
     }
 
+    const bitCapInt controlPerm = isAnti ? 0U : controlMask;
     const bitCapInt qPower = pow2(target);
 #if ENABLE_COMPLEX_X2
     const complex2 mtrxCol1(mtrx[0], mtrx[2]);
@@ -689,6 +690,10 @@ void QBdt::ApplyControlledSingle(
     bool isCannotFail = false;
 
     par_for_qbdt(0, qPower, [&](const bitCapInt& i, const int& cpu) {
+        if ((i & controlMask) != controlPerm) {
+            return (bitCapInt)(controlMask - ONE_BCI);
+        }
+
         QBdtNodeInterfacePtr leaf = root;
         QBdtNodeInterfacePtr parent = NULL;
         bitLenInt j;
@@ -701,10 +706,6 @@ void QBdt::ApplyControlledSingle(
                 break;
             }
 
-            const bitCapInt qbPow = pow2(j);
-            if ((qbPow & controlMask) && ((i & qbPow) == (isAnti ? qbPow : 0U))) {
-                return (bitCapInt)(qbPow - ONE_BCI);
-            }
             leaf->Branch();
             parent = leaf;
             leaf = leaf->branches[SelectBit(i, target - (j + 1U))];
@@ -753,11 +754,6 @@ void QBdt::ApplyControlledSingle(
             for (; j < target; j++) {
                 leaf = leaf->PopSpecial();
                 parent->branches[SelectBit(i, target - j)] = leaf;
-
-                const bitCapInt qbPow = pow2(j);
-                if ((qbPow & controlMask) && ((i & qbPow) == (isAnti ? qbPow : 0U))) {
-                    return (bitCapInt)(qbPow - ONE_BCI);
-                }
 
                 parent = leaf;
                 leaf = leaf->branches[SelectBit(i, target - (j + 1U))];
@@ -820,7 +816,6 @@ void QBdt::ApplyControlledSingle(
     // Undo isSwapped.
     if (isSwapped) {
         Swap(target, controlVec.back());
-        std::swap(target, controlVec.back());
     }
 
     FallbackMCMtrx(mtrx, controls, controlLen, target, isAnti);
@@ -873,13 +868,11 @@ void QBdt::MCPhase(
         return;
     }
 
-    std::unique_ptr<bitLenInt[]> lControls = std::unique_ptr<bitLenInt[]>(new bitLenInt[controlLen]);
+    std::unique_ptr<bitLenInt[]> lControls = std::unique_ptr<bitLenInt[]>(new bitLenInt[controlLen + 1U]);
     std::copy(controls, controls + controlLen, lControls.get());
-    std::sort(lControls.get(), lControls.get() + controlLen);
-
-    if (target < lControls[controlLen - 1U]) {
-        std::swap(target, lControls[controlLen - 1U]);
-    }
+    lControls[controlLen] = target;
+    std::sort(lControls.get(), lControls.get() + controlLen + 1U);
+    target = lControls[controlLen];
 
     ApplyControlledSingle(mtrx, lControls.get(), controlLen, target, false);
 }
