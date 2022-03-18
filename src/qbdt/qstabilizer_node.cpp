@@ -146,8 +146,8 @@ QBdtNodeInterfacePtr QBdtQStabilizerNode::PopSpecial()
     // Initialize and prune the sub-tree, and send it back up the caller.
 
     QBdtNodeInterfacePtr qn[2];
-    qn[0] = std::make_shared<QBdtQStabilizerNode>(ONE_CMPLX, q[0]);
-    qn[1] = std::make_shared<QBdtQStabilizerNode>(ONE_CMPLX, q[1]);
+    qn[0] = std::make_shared<QBdtQStabilizerNode>(SQRT1_2_R1, q[0]);
+    qn[1] = std::make_shared<QBdtQStabilizerNode>(SQRT1_2_R1, q[1]);
 
     qn[0]->Prune();
     qn[1]->Prune();
