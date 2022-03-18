@@ -169,17 +169,19 @@ QBdtNodeInterfacePtr QBdtQStabilizerNode::PopSpecial()
 
     // At this point, Alice measures both her bits.
 
-    // We measure Alice's Bell pair half...
+    // We measure Alice's Bell pair half.
+    // (It doesn't matter what the probability of the outcome is, so long as the outcome has >0 probability.)
     const bool m0 = q[0]->M(0);
     q[1]->ForceM(0, m0);
 
-    // We measure Alice's original bit...
+    // We measure Alice's original bit.
+    // (It doesn't matter what the probability of the outcome is, so long as the outcome has >0 probability.)
     const bool m1 = q[0]->M(1);
     q[1]->ForceM(1, m1);
 
     // Clean up the measured bits.
-    q[0]->Dispose(0U, 2U, 0U);
-    q[1]->Dispose(0U, 2U, 0U);
+    q[0]->Dispose(0U, 2U);
+    q[1]->Dispose(0U, 2U);
 
     // Initialize and prune the sub-tree.
     qn[0] = std::make_shared<QBdtQStabilizerNode>(SQRT1_2_R1, q[0]);
