@@ -541,8 +541,8 @@ void QBdt::ApplySingle(const complex* mtrx, bitLenInt target)
     const bitCapInt qPower = pow2(target);
 
     std::map<QInterfacePtr, bitLenInt> qis;
+    std::set<QBdtNodeInterfacePtr> qns;
     bool isFail = false;
-    bool isCannotFail = false;
 
 #if ENABLE_COMPLEX_X2
     const complex2 mtrxCol1(mtrx[0], mtrx[2]);
@@ -571,12 +571,13 @@ void QBdt::ApplySingle(const complex* mtrx, bitLenInt target)
         }
 
         if ((j == target) && leaf->branches[0]) {
-            isCannotFail = true;
 #if ENABLE_COMPLEX_X2
             leaf->Apply2x2(mtrxCol1, mtrxCol2, qubitCount - target);
 #else
             leaf->Apply2x2(mtrx, qubitCount - target);
 #endif
+            qns.insert(leaf);
+
             return (bitCapInt)0U;
         }
 
@@ -586,33 +587,9 @@ void QBdt::ApplySingle(const complex* mtrx, bitLenInt target)
         try {
             qi->Mtrx(mtrx, sTarget);
         } catch (const std::domain_error&) {
-            if (!isCannotFail) {
-                isFail = true;
-                return (bitCapInt)(qPower - ONE_BCI);
-            }
+            isFail = true;
 
-            for (; j < target; j++) {
-                leaf = leaf->PopSpecial();
-                parent->branches[SelectBit(i, target - j)] = leaf;
-
-                parent = leaf;
-                leaf = leaf->branches[SelectBit(i, target - (j + 1U))];
-
-                if (IS_NORM_0(leaf->scale)) {
-                    // WARNING: Mutates loop control variable!
-                    return (bitCapInt)(pow2(target - (j + 1U)) - ONE_BCI);
-                }
-            }
-            leaf = leaf->PopSpecial();
-            parent->branches[SelectBit(i, 0)] = leaf;
-
-#if ENABLE_COMPLEX_X2
-            leaf->Apply2x2(mtrxCol1, mtrxCol2, qubitCount - target);
-#else
-            leaf->Apply2x2(mtrx, qubitCount - target);
-#endif
-
-            return (bitCapInt)0U;
+            return (bitCapInt)(qPower - ONE_BCI);
         }
         qis[qi] = j;
 
@@ -627,11 +604,28 @@ void QBdt::ApplySingle(const complex* mtrx, bitLenInt target)
 
     complex iMtrx[4];
     inv2x2(mtrx, iMtrx);
+
     std::map<QInterfacePtr, bitLenInt>::iterator it = qis.begin();
     while (it != qis.end()) {
         it->first->Mtrx(iMtrx, target - it->second);
         it++;
     }
+
+#if ENABLE_COMPLEX_X2
+    const complex2 iMtrxCol1(iMtrx[0], iMtrx[2]);
+    const complex2 iMtrxCol2(iMtrx[1], iMtrx[3]);
+#endif
+
+    std::set<QBdtNodeInterfacePtr>::iterator itn = qns.begin();
+    while (itn != qns.end()) {
+#if ENABLE_COMPLEX_X2
+        (*itn)->Apply2x2(iMtrxCol1, iMtrxCol2, qubitCount - target);
+#else
+        (*itn)->Apply2x2(iMtrx, qubitCount - target);
+#endif
+        itn++;
+    }
+
     root->Prune(target);
 
     FallbackMtrx(mtrx, target);
@@ -686,8 +680,8 @@ void QBdt::ApplyControlledSingle(
 #endif
 
     std::map<QInterfacePtr, bitLenInt> qis;
+    std::set<QBdtNodeInterfacePtr> qns;
     bool isFail = false;
-    bool isCannotFail = false;
 
     par_for_qbdt(0, qPower, [&](const bitCapInt& i, const int& cpu) {
         if ((i & controlMask) != controlPerm) {
@@ -716,12 +710,13 @@ void QBdt::ApplyControlledSingle(
         }
 
         if ((j == target) && leaf->branches[0]) {
-            isCannotFail = true;
 #if ENABLE_COMPLEX_X2
             leaf->Apply2x2(mtrxCol1, mtrxCol2, qubitCount - target);
 #else
             leaf->Apply2x2(mtrx, qubitCount - target);
 #endif
+            qns.insert(leaf);
+
             return (bitCapInt)0U;
         }
 
@@ -729,7 +724,7 @@ void QBdt::ApplyControlledSingle(
         std::vector<bitLenInt> ketControlsVec;
         for (bitLenInt c = 0U; c < controlLen; c++) {
             const bitLenInt control = controlVec[c];
-            if (control < j) {
+            if (controlVec[c] < j) {
                 continue;
             }
             ketControlsVec.push_back(control - j);
@@ -746,33 +741,9 @@ void QBdt::ApplyControlledSingle(
                 qi->MCMtrx(sControls.get(), ketControlsVec.size(), mtrx, sTarget);
             }
         } catch (const std::domain_error&) {
-            if (!isCannotFail) {
-                isFail = true;
-                return (bitCapInt)(qPower - ONE_BCI);
-            }
+            isFail = true;
 
-            for (; j < target; j++) {
-                leaf = leaf->PopSpecial();
-                parent->branches[SelectBit(i, target - j)] = leaf;
-
-                parent = leaf;
-                leaf = leaf->branches[SelectBit(i, target - (j + 1U))];
-
-                if (IS_NORM_0(leaf->scale)) {
-                    // WARNING: Mutates loop control variable!
-                    return (bitCapInt)(pow2(target - (j + 1U)) - ONE_BCI);
-                }
-            }
-            leaf = leaf->PopSpecial();
-            parent->branches[SelectBit(i, 0)] = leaf;
-
-#if ENABLE_COMPLEX_X2
-            leaf->Apply2x2(mtrxCol1, mtrxCol2, qubitCount - target);
-#else
-            leaf->Apply2x2(mtrx, qubitCount - target);
-#endif
-
-            return (bitCapInt)0U;
+            return (bitCapInt)(qPower - ONE_BCI);
         }
         qis[qi] = j;
 
@@ -792,24 +763,40 @@ void QBdt::ApplyControlledSingle(
 
     complex iMtrx[4];
     inv2x2(mtrx, iMtrx);
-    std::map<QInterfacePtr, bitLenInt>::iterator it = qis.begin();
-    while (it != qis.end()) {
+
+    std::map<QInterfacePtr, bitLenInt>::iterator iti = qis.begin();
+    while (iti != qis.end()) {
         std::vector<bitLenInt> ketControlsVec;
         for (bitLenInt c = 0U; c < controlLen; c++) {
             const bitLenInt control = controlVec[c];
-            if (control < it->second) {
+            if (control < iti->second) {
                 continue;
             }
-            ketControlsVec.push_back(control - it->second);
+            ketControlsVec.push_back(control - iti->second);
         }
         std::unique_ptr<bitLenInt[]> sControls = std::unique_ptr<bitLenInt[]>(new bitLenInt[ketControlsVec.size()]);
         std::copy(ketControlsVec.begin(), ketControlsVec.end(), sControls.get());
         if (isAnti) {
-            it->first->MACMtrx(sControls.get(), ketControlsVec.size(), iMtrx, target - it->second);
+            iti->first->MACMtrx(sControls.get(), ketControlsVec.size(), iMtrx, target - iti->second);
         } else {
-            it->first->MCMtrx(sControls.get(), ketControlsVec.size(), iMtrx, target - it->second);
+            iti->first->MCMtrx(sControls.get(), ketControlsVec.size(), iMtrx, target - iti->second);
         }
-        it++;
+        iti++;
+    }
+
+#if ENABLE_COMPLEX_X2
+    const complex2 iMtrxCol1(iMtrx[0], iMtrx[2]);
+    const complex2 iMtrxCol2(iMtrx[1], iMtrx[3]);
+#endif
+
+    std::set<QBdtNodeInterfacePtr>::iterator itn = qns.begin();
+    while (itn != qns.end()) {
+#if ENABLE_COMPLEX_X2
+        (*itn)->Apply2x2(iMtrxCol1, iMtrxCol2, qubitCount - target);
+#else
+        (*itn)->Apply2x2(iMtrx, qubitCount - target);
+#endif
+        itn++;
     }
 
     root->Prune(target);
