@@ -107,59 +107,20 @@ QBdtNodeInterfacePtr QBdtQStabilizerNode::PopSpecial()
     // We clone the current stabilizer state.
     q[0] = std::dynamic_pointer_cast<QStabilizer>(qReg->Clone());
 
-    // First, let's divert all separable cases, for simplicity.
-    bool isSeparable = q[0]->IsSeparableZ(0);
-    bool isX, isY;
-    if (!isSeparable) {
-        q[0]->H(0);
-        isX = q[0]->IsSeparableZ(0);
-        isSeparable |= isX;
-    }
-    if (!isSeparable) {
-        q[0]->S(0);
-        isY = q[0]->IsSeparableZ(0);
-        isSeparable |= isY;
-    }
-    if (!isSeparable) {
-        q[0]->IS(0);
-        q[0]->H(0);
-    } else {
-        // If the bit is individually separable, we end up here.
-
-        // It's in Z-basis eigenstate. We can measure without destroying any information.
+    // First, let's divert Z-basis eigenstates, for simplicity.
+    const bool isZ = q[0]->IsSeparableZ(0);
+    if (isZ) {
+        // The bit is in Z-basis eigenstate. We can measure without destroying any information.
         const bool m0 = q[0]->M(0);
         // We no longer need the original qubit.
         q[0]->Dispose(0U, 1U, m0);
 
-        if (!isX && !isY) {
-            // The bit was originally a Z-basis eigenstate. Prep that state in the QBdt tree.
-            if (m0) {
-                qn[0] = std::make_shared<QBdtQStabilizerNode>();
-                qn[1] = std::make_shared<QBdtQStabilizerNode>(ONE_CMPLX, q[0]);
-            } else {
-                qn[0] = std::make_shared<QBdtQStabilizerNode>(ONE_CMPLX, q[0]);
-                qn[1] = std::make_shared<QBdtQStabilizerNode>();
-            }
+        if (m0) {
+            qn[0] = std::make_shared<QBdtQStabilizerNode>();
+            qn[1] = std::make_shared<QBdtQStabilizerNode>(ONE_CMPLX, q[0]);
         } else {
-            // The bit was originally an X or Y basis eigenstate.
-            q[1] = std::dynamic_pointer_cast<QStabilizer>(q[0]->Clone());
-
-            // The QBdt qubit is already in X basis.
-            complex amps[2] = { SQRT1_2_R1, SQRT1_2_R1 };
-
-            // Put it in Y basis, if necessary.
-            if (isY) {
-                amps[1] *= I_CMPLX;
-            }
-
-            // For X and Y bases, if the measurement was 1, we apply the same phase factor.
-            if (m0) {
-                amps[1] *= -ONE_CMPLX;
-            }
-
-            // Both amplitudes are nonzero.
-            qn[0] = std::make_shared<QBdtQStabilizerNode>(amps[0], q[0]);
-            qn[1] = std::make_shared<QBdtQStabilizerNode>(amps[1], q[1]);
+            qn[0] = std::make_shared<QBdtQStabilizerNode>(ONE_CMPLX, q[0]);
+            qn[1] = std::make_shared<QBdtQStabilizerNode>();
         }
 
         qn[0]->Prune();
@@ -198,16 +159,28 @@ QBdtNodeInterfacePtr QBdtQStabilizerNode::PopSpecial()
     // If Alice measures both bits to be 0, Bob already has the teleported state.
 
     // We measure Alice's Bell pair half...
-    q[0]->ForceM(0U, false);
-    q[1]->ForceM(0U, false);
+    const bool m0 = q[0]->M(0);
+    q[1]->ForceM(0, m0);
 
     // We measure Alice's original bit...
-    q[0]->ForceM(1U, false);
-    q[1]->ForceM(1U, false);
+    const bool m1 = q[0]->M(1);
+    q[1]->ForceM(1, m1);
 
     // Clean up the measured bits.
     q[0]->Dispose(0U, 2U, 0U);
     q[1]->Dispose(0U, 2U, 0U);
+
+    // Bob's Bell pair half starts in maximal superposition, without phase.
+    complex amps[2] = { SQRT1_2_R1, SQRT1_2_R1 };
+    if (m0) {
+        // This acts an X gate on Bob's bit.
+        // Bob's tree node amplitudes are unchanged, but the branches are swapped.
+        q[0].swap(q[1]);
+    }
+    if (m1) {
+        // This acts a Z gate on Bob's bit.
+        amps[1] *= -ONE_CMPLX;
+    }
 
     // Initialize and prune the sub-tree, and send it back up the caller.
     qn[0] = std::make_shared<QBdtQStabilizerNode>(SQRT1_2_R1, q[0]);
