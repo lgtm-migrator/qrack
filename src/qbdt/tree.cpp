@@ -17,8 +17,6 @@
 #include "qbdt_node.hpp"
 #include "qfactory.hpp"
 
-#include <iostream>
-
 namespace Qrack {
 
 QBdt::QBdt(std::vector<QInterfaceEngine> eng, bitLenInt qBitCount, bitCapInt initState, qrack_rand_gen_ptr rgp,
