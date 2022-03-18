@@ -129,15 +129,40 @@ QBdtNodeInterfacePtr QBdtQStabilizerNode::PopSpecial()
 
     // At this point, Alice measures both her bits. If both bits are zero, Bob already has the teleported state.
 
-    // If we force 0 measurement of the Bell pair half...
-    q[0]->ForceM(0U, false);
-    q[1]->ForceM(0U, false);
+    // We measure Alice's Bell pair half...
+    const real1_f probQb0 = (q[0]->Prob(0) + q[1]->Prob(0)) / 2U;
+    bool m0;
+    if (probQb0 <= FP_NORM_EPSILON) {
+        m0 = false;
+    } else if ((ONE_R1 - probQb0) <= FP_NORM_EPSILON) {
+        m0 = true;
+    } else {
+        m0 = q[0]->Rand() <= probQb0;
+    }
+    q[0]->ForceM(0U, m0);
+    q[1]->ForceM(0U, m0);
 
-    // And we force 0 measurement of the original bit...
-    q[0]->ForceM(1U, false);
-    q[1]->ForceM(1U, false);
+    // We measure Alice's original bit...
+    const real1_f probQb1 = (q[0]->Prob(1) + q[1]->Prob(1)) / 2U;
+    bool m1;
+    if (probQb1 <= FP_NORM_EPSILON) {
+        m1 = false;
+    } else if ((ONE_R1 - probQb1) <= FP_NORM_EPSILON) {
+        m1 = true;
+    } else {
+        m1 = q[1]->Rand() <= probQb1;
+    }
+    q[0]->ForceM(1U, m1);
+    q[1]->ForceM(1U, m1);
 
-    // ...Bob already has the teleported qubit. ;-)
+    // Bob finishes teleportation based on Alice's measurement.
+    complex amps[2] = { SQRT1_2_R1, SQRT1_2_R1 };
+    if (m0) {
+        amps[1] *= -ONE_CMPLX;
+    }
+    if (m1) {
+        std::swap(amps[0], amps[1]);
+    }
 
     // Clean up the measured bits.
     q[0]->Dispose(0U, 2U, 0U);
@@ -146,8 +171,8 @@ QBdtNodeInterfacePtr QBdtQStabilizerNode::PopSpecial()
     // Initialize and prune the sub-tree, and send it back up the caller.
 
     QBdtNodeInterfacePtr qn[2];
-    qn[0] = std::make_shared<QBdtQStabilizerNode>(SQRT1_2_R1, q[0]);
-    qn[1] = std::make_shared<QBdtQStabilizerNode>(SQRT1_2_R1, q[1]);
+    qn[0] = std::make_shared<QBdtQStabilizerNode>(amps[0], q[0]);
+    qn[1] = std::make_shared<QBdtQStabilizerNode>(amps[1], q[1]);
 
     qn[0]->Prune();
     qn[1]->Prune();

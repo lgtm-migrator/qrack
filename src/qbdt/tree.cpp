@@ -478,14 +478,8 @@ bitCapInt QBdt::MAll()
     bool bitResult = false;
     for (bitLenInt i = 0; i < qubitCount; i++) {
         if (!leaf->branches[0]) {
-            leaf = leaf->PopSpecial();
-            if (!i) {
-                root = leaf;
-            } else {
-                parent->branches[bitResult ? 1U : 0U] = leaf;
-            }
-        } else {
-            leaf->Branch();
+            result |= NODE_TO_QINTERFACE(leaf)->MAll() << i;
+            break;
         }
 
         real1_f oneChance = clampProb(norm(leaf->branches[1]->scale));
@@ -510,6 +504,8 @@ bitCapInt QBdt::MAll()
             leaf = leaf->branches[0];
         }
     }
+
+    SetPermutation(result);
 
     return result;
 }
