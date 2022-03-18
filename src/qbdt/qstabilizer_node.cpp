@@ -100,9 +100,7 @@ bool QBdtQStabilizerNode::isEqualUnder(QBdtNodeInterfacePtr r)
 
 QBdtNodeInterfacePtr QBdtQStabilizerNode::PopSpecial()
 {
-    // NOTE: This is basically the quantum teleportation algorithm, (with forced measurement results for total
-    // simplicity, since this is simulated).
-
+    // NOTE: This is basically the quantum teleportation algorithm.
     QStabilizerPtr q[2];
 
     // We clone the current stabilizer state.
@@ -126,8 +124,10 @@ QBdtNodeInterfacePtr QBdtQStabilizerNode::PopSpecial()
     // Alice entangles her bit with the Bell pair.
     q[0]->CNOT(1, 0);
     q[1]->CNOT(1, 0);
+    q[0]->H(1);
+    q[1]->H(1);
 
-    // At this point, Alice measures both her bits. If both bits are zero, Bob already has the teleported state.
+    // At this point, Alice measures both her bits.
 
     // We measure Alice's Bell pair half...
     const real1_f probQb0 = (q[0]->Prob(0) + q[1]->Prob(0)) / 2U;
@@ -157,11 +157,11 @@ QBdtNodeInterfacePtr QBdtQStabilizerNode::PopSpecial()
 
     // Bob finishes teleportation based on Alice's measurement.
     complex amps[2] = { SQRT1_2_R1, SQRT1_2_R1 };
-    if (m1) {
-        amps[1] *= -ONE_CMPLX;
-    }
     if (m0) {
         std::swap(amps[0], amps[1]);
+    }
+    if (m1) {
+        amps[1] *= -ONE_CMPLX;
     }
 
     // Clean up the measured bits.
