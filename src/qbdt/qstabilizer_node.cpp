@@ -180,6 +180,9 @@ QBdtNodeInterfacePtr QBdtQStabilizerNode::PopSpecial()
     q[1]->ForceM(1, m1);
 
     // Clean up the measured bits.
+    if (!q[0]->CanDecomposeDispose(0U, 2U) || !q[1]->CanDecomposeDispose(0U, 2U)) {
+        throw std::runtime_error("QBdtQStabilizerNode::PopSpecial() cannot Dispose()!");
+    }
     q[0]->Dispose(0U, 2U);
     q[1]->Dispose(0U, 2U);
 
