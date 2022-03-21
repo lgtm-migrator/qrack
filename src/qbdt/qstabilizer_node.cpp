@@ -123,18 +123,39 @@ QBdtNodeInterfacePtr QBdtQStabilizerNode::PopSpecial()
 
     // First, let's divert Z-basis eigenstates, for simplicity.
     const bool isZ = q[0]->IsSeparableZ(0);
-    if (isZ) {
+    const bool isX = !isZ && q[0]->IsSeparableX(0);
+    const bool isY = !isZ && !isX && q[0]->IsSeparableY(0);
+    if (isZ || isX || isY) {
+        if (isY) {
+            q[0]->IS(0);
+        }
+        if (isX || isY) {
+            q[0]->H(0);
+        }
+
         // The bit is in Z-basis eigenstate. We can measure without destroying any information.
         const bool m0 = q[0]->M(0);
         // We no longer need the original qubit.
         q[0]->Dispose(0U, 1U, m0);
 
-        if (m0) {
-            qn[0] = std::make_shared<QBdtQStabilizerNode>();
-            qn[1] = std::make_shared<QBdtQStabilizerNode>(ONE_CMPLX, q[0]);
+        if (isZ) {
+            if (m0) {
+                qn[0] = std::make_shared<QBdtQStabilizerNode>();
+                qn[1] = std::make_shared<QBdtQStabilizerNode>(ONE_CMPLX, q[0]);
+            } else {
+                qn[0] = std::make_shared<QBdtQStabilizerNode>(ONE_CMPLX, q[0]);
+                qn[1] = std::make_shared<QBdtQStabilizerNode>();
+            }
         } else {
-            qn[0] = std::make_shared<QBdtQStabilizerNode>(ONE_CMPLX, q[0]);
-            qn[1] = std::make_shared<QBdtQStabilizerNode>();
+            complex amps[2] = { SQRT1_2_R1, SQRT1_2_R1 };
+            if (isY) {
+                amps[1] *= I_CMPLX;
+            }
+            if (m0) {
+                amps[1] *= -ONE_CMPLX;
+            }
+            qn[0] = std::make_shared<QBdtQStabilizerNode>(amps[0], q[0]);
+            qn[1] = std::make_shared<QBdtQStabilizerNode>(amps[1], q[0]);
         }
 
         qn[0]->Prune();
@@ -180,9 +201,6 @@ QBdtNodeInterfacePtr QBdtQStabilizerNode::PopSpecial()
     q[1]->ForceM(1, m1);
 
     // Clean up the measured bits.
-    if (!q[0]->CanDecomposeDispose(0U, 2U) || !q[1]->CanDecomposeDispose(0U, 2U)) {
-        throw std::runtime_error("QBdtQStabilizerNode::PopSpecial() cannot Dispose()!");
-    }
     q[0]->Dispose(0U, 2U);
     q[1]->Dispose(0U, 2U);
 
