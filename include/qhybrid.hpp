@@ -122,7 +122,7 @@ public:
         return engine->ProbReg(start, length, permutation);
     }
 
-    using QInterface::Compose;
+    using QEngine::Compose;
     virtual bitLenInt Compose(QHybridPtr toCopy)
     {
         bitLenInt nQubitCount = qubitCount + toCopy->qubitCount;
@@ -144,6 +144,7 @@ public:
     {
         return Compose(std::dynamic_pointer_cast<QHybrid>(toCopy), start);
     }
+    using QEngine::Decompose;
     virtual void Decompose(bitLenInt start, QInterfacePtr dest)
     {
         Decompose(start, std::dynamic_pointer_cast<QHybrid>(dest));

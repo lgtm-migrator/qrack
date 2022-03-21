@@ -58,9 +58,13 @@ QStabilizer::QStabilizer(bitLenInt n, bitCapInt perm, qrack_rand_gen_ptr rgp, co
     SetPermutation(perm);
 }
 
-void QStabilizer::SetPermutation(const bitCapInt& perm)
+void QStabilizer::SetPermutation(bitCapInt perm, complex phaseFac)
 {
     Dump();
+
+    if (phaseFac != CMPLX_DEFAULT_ARG) {
+        phaseOffset = phaseFac;
+    }
 
     const bitLenInt rowCount = (qubitCount << 1U);
 
@@ -105,7 +109,7 @@ void QStabilizer::rowcopy(const bitLenInt& i, const bitLenInt& k)
     r[i] = r[k];
 }
 
-/// Swaps row i and row k
+/// Swaps row i and row k - does not change the logical state
 void QStabilizer::rowswap(const bitLenInt& i, const bitLenInt& k)
 {
     if (i == k) {
@@ -120,20 +124,19 @@ void QStabilizer::rowswap(const bitLenInt& i, const bitLenInt& k)
 /// Sets row i equal to the bth observable (X_1,...X_n,Z_1,...,Z_n)
 void QStabilizer::rowset(const bitLenInt& i, bitLenInt b)
 {
-    r[i] = 0;
-
     // Dealloc, first
     x[i] = BoolVector();
     z[i] = BoolVector();
 
     x[i] = BoolVector(qubitCount, false);
     z[i] = BoolVector(qubitCount, false);
+    r[i] = 0;
 
     if (b < qubitCount) {
-        z[i][b] = true;
+        x[i][b] = true;
     } else {
         b -= qubitCount;
-        x[i][b] = true;
+        z[i][b] = true;
     }
 }
 
@@ -172,7 +175,7 @@ uint8_t QStabilizer::clifford(const bitLenInt& i, const bitLenInt& k)
     return e;
 }
 
-/// Left-multiply row i by row k
+/// Left-multiply row i by row k - does not change the logical state
 void QStabilizer::rowmult(const bitLenInt& i, const bitLenInt& k)
 {
     r[i] = clifford(i, k);
@@ -341,49 +344,10 @@ void QStabilizer::setBasisProb(const real1_f& nrm, real1* outputProbs)
     outputProbs[entry.permutation] = norm(entry.amplitude);
 }
 
-bool QStabilizer::isEqual(QStabilizerPtr toCompare)
-{
-    if (!toCompare) {
-        return false;
-    }
-
-    if (qubitCount != toCompare->qubitCount) {
-        return false;
-    }
-
-    if (!qubitCount) {
-        return true;
-    }
-
-    if ((!randGlobalPhase || !toCompare->randGlobalPhase) && !IS_NORM_0(phaseOffset - toCompare->phaseOffset)) {
-        return false;
-    }
-
-    gaussian();
-    toCompare->gaussian();
-
-    const bitLenInt elemCount = qubitCount << 1U;
-
-    for (bitLenInt i = 0; i < elemCount; i++) {
-        if (r[i] != toCompare->r[i]) {
-            return false;
-        }
-        for (bitLenInt j = 0; j < qubitCount; j++) {
-            if (x[i][j] != toCompare->x[i][j]) {
-                return false;
-            }
-            if (z[i][j] != toCompare->z[i][j]) {
-                return false;
-            }
-        }
-    }
-
-    return true;
-}
-
 #define C_SQRT1_2 complex(M_SQRT1_2, ZERO_R1)
 #define C_I_SQRT1_2 complex(ZERO_R1, M_SQRT1_2)
 
+/// Get the phase radians of the lowest permutation nonzero amplitude
 real1_f QStabilizer::FirstNonzeroPhase()
 {
     Finish();
@@ -754,9 +718,7 @@ uint8_t QStabilizer::IsSeparable(const bitLenInt& t)
     return 0;
 }
 
-/**
- * Measure qubit b
- */
+/// Measure qubit t
 bool QStabilizer::ForceM(bitLenInt t, bool result, bool doForce, bool doApply)
 {
     if (doForce && !doApply) {
@@ -801,8 +763,14 @@ bool QStabilizer::ForceM(bitLenInt t, bool result, bool doForce, bool doApply)
 
         r[p + n] = result ? 2U : 0U;
         // Now update the Xbar's and Zbar's that don't commute with Z_b
-        for (bitLenInt i = 0; i < elemCount; i++) {
-            if ((i != p) && x[i][t]) {
+        for (bitLenInt i = 0; i < p; i++) {
+            if (x[i][t]) {
+                rowmult(i, p);
+            }
+        }
+        // (Skip "p" row)
+        for (bitLenInt i = p + 1U; i < elemCount; i++) {
+            if (x[i][t]) {
                 rowmult(i, p);
             }
         }
@@ -821,7 +789,7 @@ bool QStabilizer::ForceM(bitLenInt t, bool result, bool doForce, bool doApply)
     }
 
     if (m >= n) {
-        return r[elemCount];
+        throw std::runtime_error("QStabilizer::ForceM() could not find an anti-commuting destabilizer!");
     }
 
     rowcopy(elemCount, m + n);
@@ -993,36 +961,56 @@ void QStabilizer::DecomposeDispose(const bitLenInt start, const bitLenInt length
     }
 }
 
-bool QStabilizer::ApproxCompare(QStabilizerPtr o)
+real1_f QStabilizer::ApproxCompareHelper(QStabilizerPtr toCompare, bool isDiscreteBool, real1_f error_tol)
 {
-    if (qubitCount != o->qubitCount) {
-        return false;
+    if (!toCompare) {
+        return ONE_R1;
     }
 
-    o->Finish();
+    if (this == toCompare.get()) {
+        return ZERO_R1;
+    }
+
+    // If the qubit counts are unequal, these can't be approximately equal objects.
+    if (qubitCount != toCompare->qubitCount) {
+        // Max square difference:
+        return ONE_R1;
+    }
+
+    toCompare->Finish();
     Finish();
 
-    o->gaussian();
-    gaussian();
+    const bitCapInt maxQPower = GetMaxQPower();
+    complex proj = ZERO_CMPLX;
 
-    const bitLenInt rowCount = (qubitCount << 1U);
+    if (isDiscreteBool) {
+        real1_f potential = ZERO_R1;
+        real1_f oPotential = ZERO_R1;
+        for (bitCapInt i = 0U; i < maxQPower; i++) {
+            const complex amp = GetAmplitude(i);
+            const complex oAmp = toCompare->GetAmplitude(i);
 
-    for (bitLenInt i = 0; i < rowCount; i++) {
-        if (r[i] != o->r[i]) {
-            return false;
+            potential += norm(amp);
+            oPotential += norm(oAmp);
+            if ((potential - oPotential) > error_tol) {
+                return ONE_R1;
+            }
+
+            proj += conj(amp) * oAmp;
+            const real1_f prob = clampProb(norm(proj));
+            if (error_tol >= (ONE_R1 - prob)) {
+                return ZERO_R1;
+            }
         }
 
-        for (bitLenInt j = 0; j < qubitCount; j++) {
-            if (x[i][j] != o->x[i][j]) {
-                return false;
-            }
-            if (z[i][j] != o->z[i][j]) {
-                return false;
-            }
-        }
+        return ONE_R1 - clampProb(norm(proj));
     }
 
-    return true;
+    for (bitCapInt i = 0U; i < maxQPower; i++) {
+        proj += conj(GetAmplitude(i)) * toCompare->GetAmplitude(i);
+    }
+
+    return ONE_R1 - clampProb(norm(proj));
 }
 
 real1_f QStabilizer::Prob(bitLenInt qubit)

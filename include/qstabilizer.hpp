@@ -174,7 +174,7 @@ public:
 
     bitCapInt GetMaxQPower() { return pow2(qubitCount); }
 
-    void SetPermutation(const bitCapInt& perm);
+    virtual void SetPermutation(bitCapInt perm, complex phaseFac = CMPLX_DEFAULT_ARG);
 
     void SetRandomSeed(uint32_t seed)
     {
@@ -236,6 +236,9 @@ protected:
 
     void DecomposeDispose(const bitLenInt start, const bitLenInt length, QStabilizerPtr toCopy);
 
+    real1_f ApproxCompareHelper(
+        QStabilizerPtr toCompare, bool isDiscreteBool, real1_f error_tol = TRYDECOMPOSE_EPSILON);
+
 public:
     void SetQuantumState(const complex* inputState)
     {
@@ -256,17 +259,6 @@ public:
     void SetAmplitude(bitCapInt perm, complex amp)
     {
         throw std::domain_error("QStabilizer::SetAmplitude() not implemented!");
-    }
-
-    virtual bool ApproxCompare(QInterfacePtr toCompare, real1_f ignored = TRYDECOMPOSE_EPSILON)
-    {
-        return isEqual(std::dynamic_pointer_cast<QStabilizer>(toCompare));
-    }
-    virtual bool isEqual(QStabilizerPtr toCompare);
-
-    real1_f SumSqrDiff(QInterfacePtr toCompare)
-    {
-        throw std::domain_error("QStabilizer::SumSqrDiff() not implemented!");
     }
 
     /// Apply a CNOT gate with control and target
@@ -290,11 +282,18 @@ public:
 
     virtual void Swap(bitLenInt qubitIndex1, bitLenInt qubitIndex2);
 
-    /**
-     * Measure qubit b
-     */
+    /// Measure qubit t
     virtual bool ForceM(bitLenInt t, bool result, bool doForce = true, bool doApply = true);
 
+    /// Measure all qubits
+    virtual bitCapInt MAll()
+    {
+        bitCapInt toRet = QInterface::MAll();
+        SetPermutation(toRet);
+        return toRet;
+    }
+
+    /// Get the phase radians of the lowest permutation nonzero amplitude
     virtual real1_f FirstNonzeroPhase();
 
     /// Convert the state to ket notation
@@ -330,6 +329,7 @@ public:
      */
     uint8_t IsSeparable(const bitLenInt& target);
 
+    using QInterface::Compose;
     virtual bitLenInt Compose(QInterfacePtr toCopy) { return Compose(std::dynamic_pointer_cast<QStabilizer>(toCopy)); }
     virtual bitLenInt Compose(QStabilizerPtr toCopy) { return Compose(toCopy, qubitCount); }
     virtual bitLenInt Compose(QInterfacePtr toCopy, bitLenInt start)
@@ -349,8 +349,6 @@ public:
     }
     bool CanDecomposeDispose(const bitLenInt start, const bitLenInt length);
 
-    virtual bool ApproxCompare(QStabilizerPtr o);
-
     virtual void NormalizeState(
         real1_f nrm = REAL1_DEFAULT_ARG, real1_f norm_thresh = REAL1_DEFAULT_ARG, real1_f phaseArg = ZERO_R1)
     {
@@ -361,6 +359,15 @@ public:
     virtual void UpdateRunningNorm(real1_f norm_thresh = REAL1_DEFAULT_ARG)
     {
         // Intentionally left blank
+    }
+
+    virtual real1_f SumSqrDiff(QInterfacePtr toCompare)
+    {
+        return ApproxCompareHelper(std::dynamic_pointer_cast<QStabilizer>(toCompare), false);
+    }
+    virtual bool ApproxCompare(QInterfacePtr toCompare, real1_f error_tol = TRYDECOMPOSE_EPSILON)
+    {
+        return error_tol >= ApproxCompareHelper(std::dynamic_pointer_cast<QStabilizer>(toCompare), true, error_tol);
     }
 
     virtual real1_f Prob(bitLenInt qubit);
