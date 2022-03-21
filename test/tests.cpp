@@ -1103,6 +1103,39 @@ TEST_CASE_METHOD(QInterfaceTestFixture, "test_zmask")
     REQUIRE_THAT(qftReg, HasProbability(0, 20, 0x80001));
 }
 
+TEST_CASE_METHOD(QInterfaceTestFixture, "test_approxcompare")
+{
+    qftReg = CreateQuantumInterface({ testEngineType, testSubEngineType, testSubSubEngineType }, 3U, 0, rng, ONE_CMPLX,
+        enable_normalization, true, false, device_id, !disable_hardware_rng, sparse, REAL1_DEFAULT_ARG, devList, 10);
+    QInterfacePtr qftReg2 = CreateQuantumInterface({ testEngineType, testSubEngineType, testSubSubEngineType }, 3U, 0,
+        rng, ONE_CMPLX, enable_normalization, true, false, device_id, !disable_hardware_rng, sparse, REAL1_DEFAULT_ARG,
+        devList, 10);
+
+    qftReg->X(0);
+    qftReg->H(0);
+    qftReg->CNOT(0, 1);
+    qftReg2->X(0);
+    qftReg2->H(0);
+    qftReg2->CNOT(0, 1);
+    REQUIRE(qftReg->ApproxCompare(qftReg2));
+    REQUIRE_FLOAT(qftReg->SumSqrDiff(qftReg2), 0U);
+    qftReg2->H(2);
+    REQUIRE(!qftReg->ApproxCompare(qftReg2));
+    REQUIRE(qftReg->SumSqrDiff(qftReg2) > (ONE_R1 / 10));
+
+    qftReg->SetPermutation(0);
+    qftReg2->SetPermutation(0);
+    qftReg->H(0, 2);
+    qftReg->CCNOT(0, 1, 2);
+    qftReg->CCNOT(0, 1, 2);
+    qftReg->H(0, 2);
+    REQUIRE(qftReg->ApproxCompare(qftReg2));
+
+    qftReg->SetPermutation(1);
+    qftReg2->SetPermutation(2);
+    REQUIRE(!qftReg->ApproxCompare(qftReg2));
+}
+
 TEST_CASE_METHOD(QInterfaceTestFixture, "test_phaseparity")
 {
     qftReg->SetPermutation(0x40001);

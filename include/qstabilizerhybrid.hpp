@@ -185,6 +185,9 @@ protected:
 
     virtual void CacheEigenstate(bitLenInt target);
 
+    virtual real1_f ApproxCompareHelper(
+        QStabilizerHybridPtr toCompare, bool isDiscreteBool, real1_f error_tol = TRYDECOMPOSE_EPSILON);
+
 public:
     QStabilizerHybrid(std::vector<QInterfaceEngine> eng, bitLenInt qBitCount, bitCapInt initState = 0,
         qrack_rand_gen_ptr rgp = nullptr, complex phaseFac = CMPLX_DEFAULT_ARG, bool doNorm = false,
@@ -398,7 +401,7 @@ public:
 
     virtual bool isBinaryDecisionTree() { return engine && engine->isBinaryDecisionTree(); };
 
-    using QInterface::Compose;
+    using QEngine::Compose;
     virtual bitLenInt Compose(QStabilizerHybridPtr toCopy)
     {
         const bitLenInt nQubits = qubitCount + toCopy->qubitCount;
@@ -425,7 +428,14 @@ public:
             toRet = stabilizer->Compose(toCopy->stabilizer);
         }
 
+        // Resize the shards buffer.
         shards.insert(shards.end(), toCopy->shards.begin(), toCopy->shards.end());
+        // Split the common shared_ptr references, with toCopy.
+        for (bitLenInt i = qubitCount; i < nQubits; i++) {
+            if (shards[i]) {
+                shards[i] = shards[i]->Clone();
+            }
+        }
 
         SetQubitCount(nQubits);
 
@@ -917,7 +927,9 @@ public:
 
     virtual void PhaseFlip()
     {
-        if (engine) {
+        if (stabilizer) {
+            stabilizer->PhaseFlip();
+        } else {
             engine->PhaseFlip();
         }
     }
@@ -929,11 +941,21 @@ public:
 
     virtual void SqrtSwap(bitLenInt qubitIndex1, bitLenInt qubitIndex2)
     {
+        if (stabilizer) {
+            QInterface::SqrtSwap(qubitIndex1, qubitIndex2);
+            return;
+        }
+
         SwitchToEngine();
         engine->SqrtSwap(qubitIndex1, qubitIndex2);
     }
     virtual void ISqrtSwap(bitLenInt qubitIndex1, bitLenInt qubitIndex2)
     {
+        if (stabilizer) {
+            QInterface::ISqrtSwap(qubitIndex1, qubitIndex2);
+            return;
+        }
+
         SwitchToEngine();
         engine->ISqrtSwap(qubitIndex1, qubitIndex2);
     }
@@ -943,11 +965,6 @@ public:
         engine->FSim(theta, phi, qubitIndex1, qubitIndex2);
     }
 
-    virtual real1_f ProbAll(bitCapInt fullRegister)
-    {
-        SwitchToEngine();
-        return engine->ProbAll(fullRegister);
-    }
     virtual real1_f ProbMask(bitCapInt mask, bitCapInt permutation)
     {
         SwitchToEngine();
@@ -956,89 +973,12 @@ public:
 
     virtual real1_f SumSqrDiff(QInterfacePtr toCompare)
     {
-        return SumSqrDiff(std::dynamic_pointer_cast<QStabilizerHybrid>(toCompare));
+        return ApproxCompareHelper(std::dynamic_pointer_cast<QStabilizerHybrid>(toCompare), false);
     }
-
-    virtual real1_f SumSqrDiff(QStabilizerHybridPtr toCompare)
-    {
-        // If the qubit counts are unequal, these can't be approximately equal objects.
-        if (qubitCount != toCompare->qubitCount) {
-            // Max square difference:
-            return ONE_R1;
-        }
-
-        QStabilizerHybridPtr thisClone = stabilizer ? std::dynamic_pointer_cast<QStabilizerHybrid>(Clone()) : NULL;
-        QStabilizerHybridPtr thatClone =
-            toCompare->stabilizer ? std::dynamic_pointer_cast<QStabilizerHybrid>(toCompare->Clone()) : NULL;
-
-        if (thisClone) {
-            thisClone->SwitchToEngine();
-        }
-        if (thatClone) {
-            thatClone->SwitchToEngine();
-        }
-
-        QInterfacePtr thisEngine = thisClone ? thisClone->engine : engine;
-        QInterfacePtr thatEngine = thatClone ? thatClone->engine : toCompare->engine;
-
-        const real1_f toRet = thisEngine->SumSqrDiff(thatEngine);
-
-        if (toRet > TRYDECOMPOSE_EPSILON) {
-            return toRet;
-        }
-
-        if (!stabilizer && toCompare->stabilizer) {
-            SetPermutation(0);
-            stabilizer = std::dynamic_pointer_cast<QStabilizer>(toCompare->stabilizer->Clone());
-        } else if (stabilizer && !toCompare->stabilizer) {
-            toCompare->SetPermutation(0);
-            toCompare->stabilizer = std::dynamic_pointer_cast<QStabilizer>(stabilizer->Clone());
-        }
-
-        return toRet;
-    }
-
     virtual bool ApproxCompare(QInterfacePtr toCompare, real1_f error_tol = TRYDECOMPOSE_EPSILON)
     {
-        return ApproxCompare(std::dynamic_pointer_cast<QStabilizerHybrid>(toCompare), error_tol);
-    }
-
-    virtual bool ApproxCompare(QStabilizerHybridPtr toCompare, real1_f error_tol = TRYDECOMPOSE_EPSILON)
-    {
-        FlushBuffers();
-        toCompare->FlushBuffers();
-
-        if (stabilizer && toCompare->stabilizer) {
-            return stabilizer->ApproxCompare(toCompare->stabilizer);
-        }
-
-        QStabilizerHybridPtr thisClone = stabilizer ? std::dynamic_pointer_cast<QStabilizerHybrid>(Clone()) : NULL;
-        QStabilizerHybridPtr thatClone =
-            toCompare->stabilizer ? std::dynamic_pointer_cast<QStabilizerHybrid>(Clone()) : NULL;
-
-        if (thisClone) {
-            thisClone->SwitchToEngine();
-        }
-        if (thatClone) {
-            thatClone->SwitchToEngine();
-        }
-
-        QInterfacePtr thisEngine = thisClone ? thisClone->engine : engine;
-        QInterfacePtr thatEngine = thatClone ? thatClone->engine : toCompare->engine;
-
-        if (!thisEngine->ApproxCompare(thatEngine, error_tol)) {
-            return false;
-        }
-
-        if (!stabilizer && toCompare->stabilizer) {
-            SetPermutation(0);
-            stabilizer = std::dynamic_pointer_cast<QStabilizer>(toCompare->stabilizer->Clone());
-        } else if (stabilizer && !toCompare->stabilizer) {
-            toCompare->SetPermutation(0);
-            toCompare->stabilizer = std::dynamic_pointer_cast<QStabilizer>(stabilizer->Clone());
-        }
-
-        return true;
+        return error_tol >=
+            ApproxCompareHelper(std::dynamic_pointer_cast<QStabilizerHybrid>(toCompare), true, error_tol);
     }
 
     virtual void UpdateRunningNorm(real1_f norm_thresh = REAL1_DEFAULT_ARG)

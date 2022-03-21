@@ -97,11 +97,11 @@ void QStabilizerHybrid::CacheEigenstate(bitLenInt target)
         toRet = std::make_shared<MpsShard>(mtrx);
     } else if (stabilizer->IsSeparableY(target)) {
         // Y eigenstate
+        stabilizer->IS(target);
         stabilizer->H(target);
-        stabilizer->S(target);
 
-        const complex mtrx[4] = { complex(SQRT1_2_R1, ZERO_R1), complex(ZERO_R1, -SQRT1_2_R1),
-            complex(SQRT1_2_R1, ZERO_R1), complex(ZERO_R1, SQRT1_2_R1) };
+        const complex mtrx[4] = { complex(SQRT1_2_R1, ZERO_R1), complex(SQRT1_2_R1, ZERO_R1),
+            complex(ZERO_R1, SQRT1_2_R1), complex(ZERO_R1, -SQRT1_2_R1) };
         toRet = std::make_shared<MpsShard>(mtrx);
     }
 
@@ -210,10 +210,6 @@ void QStabilizerHybrid::Decompose(bitLenInt start, QStabilizerHybridPtr dest)
         return;
     }
 
-    if (stabilizer && !stabilizer->CanDecomposeDispose(start, length)) {
-        SwitchToEngine();
-    }
-
     if (engine) {
         if (engineTypes[0] == QINTERFACE_QPAGER) {
             dest->TurnOnPaging();
@@ -258,10 +254,6 @@ void QStabilizerHybrid::Dispose(bitLenInt start, bitLenInt length)
         return;
     }
 
-    if (stabilizer && !stabilizer->CanDecomposeDispose(start, length)) {
-        SwitchToEngine();
-    }
-
     if (engine) {
         engine->Dispose(start, length);
     } else {
@@ -290,10 +282,6 @@ void QStabilizerHybrid::Dispose(bitLenInt start, bitLenInt length, bitCapInt dis
         SetQubitCount(1);
         stabilizer = MakeStabilizer(0);
         return;
-    }
-
-    if (stabilizer && !stabilizer->CanDecomposeDispose(start, length)) {
-        SwitchToEngine();
     }
 
     if (engine) {
@@ -631,12 +619,6 @@ bool QStabilizerHybrid::ForceM(bitLenInt qubit, bool result, bool doForce, bool 
         InvertBuffer(qubit);
     }
 
-    // This check will first try to coax into decomposable form:
-    if (doApply && !stabilizer->CanDecomposeDispose(qubit, 1)) {
-        SwitchToEngine();
-        return engine->ForceM(qubit, result, doForce, doApply);
-    }
-
     if (shards[qubit]) {
         if (!shards[qubit]->IsPhase() && stabilizer->IsSeparableZ(qubit)) {
             if (doForce) {
@@ -767,5 +749,76 @@ void QStabilizerHybrid::MultiShotMeasureMask(
         }
         shotsArray[shot] = (unsigned)sample;
     });
+}
+
+real1_f QStabilizerHybrid::ApproxCompareHelper(QStabilizerHybridPtr toCompare, bool isDiscreteBool, real1_f error_tol)
+{
+    if (!toCompare) {
+        return ONE_R1;
+    }
+
+    if (this == toCompare.get()) {
+        return ZERO_R1;
+    }
+
+    // If the qubit counts are unequal, these can't be approximately equal objects.
+    if (qubitCount != toCompare->qubitCount) {
+        // Max square difference:
+        return ONE_R1;
+    }
+
+    QStabilizerHybridPtr thisClone = stabilizer ? std::dynamic_pointer_cast<QStabilizerHybrid>(Clone()) : NULL;
+    QStabilizerHybridPtr thatClone =
+        toCompare->stabilizer ? std::dynamic_pointer_cast<QStabilizerHybrid>(toCompare->Clone()) : NULL;
+
+    if (thisClone) {
+        thisClone->FlushBuffers();
+    }
+
+    if (thatClone) {
+        thatClone->FlushBuffers();
+    }
+
+    if (thisClone && thisClone->stabilizer && thatClone && thatClone->stabilizer) {
+        if (isDiscreteBool) {
+            return thisClone->stabilizer->ApproxCompare(thatClone->stabilizer, error_tol) ? ZERO_R1 : ONE_R1;
+        } else {
+            return thisClone->stabilizer->SumSqrDiff(thatClone->stabilizer);
+        }
+    }
+
+    if (thisClone) {
+        thisClone->SwitchToEngine();
+    }
+
+    if (thatClone) {
+        thatClone->SwitchToEngine();
+    }
+
+    QInterfacePtr thisEngine = thisClone ? thisClone->engine : engine;
+    QInterfacePtr thatEngine = thatClone ? thatClone->engine : toCompare->engine;
+
+    const real1_f toRet = isDiscreteBool ? (thisEngine->ApproxCompare(thatEngine, error_tol) ? ZERO_R1 : ONE_R1)
+                                         : thisEngine->SumSqrDiff(thatEngine);
+
+    if (toRet > TRYDECOMPOSE_EPSILON) {
+        return toRet;
+    }
+
+    if (!stabilizer && toCompare->stabilizer) {
+        SetPermutation(0);
+        stabilizer = std::dynamic_pointer_cast<QStabilizer>(toCompare->stabilizer->Clone());
+        for (bitLenInt i = 0; i < qubitCount; i++) {
+            shards[i] = toCompare->shards[i] ? toCompare->shards[i]->Clone() : NULL;
+        }
+    } else if (stabilizer && !toCompare->stabilizer) {
+        toCompare->SetPermutation(0);
+        toCompare->stabilizer = std::dynamic_pointer_cast<QStabilizer>(stabilizer->Clone());
+        for (bitLenInt i = 0; i < qubitCount; i++) {
+            toCompare->shards[i] = shards[i] ? shards[i]->Clone() : NULL;
+        }
+    }
+
+    return toRet;
 }
 } // namespace Qrack
