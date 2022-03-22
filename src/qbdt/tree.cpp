@@ -508,8 +508,11 @@ bitCapInt QBdt::MAll()
 }
 
 #define IS_REAL_0(r) (abs(r) <= FP_NORM_EPSILON)
-#define IS_CTRLED_CLIFFORD(top, bottom)                                                                                \
+#define _IS_CTRLED_CLIFFORD(top, bottom)                                                                               \
     ((IS_REAL_0(std::real(top)) || IS_REAL_0(std::imag(top))) && (IS_SAME(top, bottom) || IS_SAME(top, -bottom)))
+#define IS_CTRLED_CLIFFORD(mtrx)                                                                                       \
+    !((IS_NORM_0(mtrx[1]) && IS_NORM_0(mtrx[2]) && _IS_CTRLED_CLIFFORD(mtrx[0], mtrx[1])) ||                           \
+        (IS_NORM_0(mtrx[0]) && IS_NORM_0(mtrx[3]) && _IS_CTRLED_CLIFFORD(mtrx[1], mtrx[2])))
 #define IS_CLIFFORD(mtrx)                                                                                              \
     (IS_SAME(mtrx[0], mtrx[1]) || IS_SAME(mtrx[0], -mtrx[1]) || IS_SAME(mtrx[0], I_CMPLX * mtrx[1]) ||                 \
         IS_SAME(mtrx[0], -I_CMPLX * mtrx[1])) &&                                                                       \
@@ -565,7 +568,11 @@ void QBdt::ApplySingle(const complex* mtrx, bitLenInt target)
                 // WARNING: Mutates loop control variable!
                 return (bitCapInt)(pow2(target - j) - ONE_BCI);
             }
-            if (!leaf->branches[0] && !isClifford) {
+            if (!leaf->branches[0]) {
+                if (isClifford) {
+                    break;
+                }
+
                 leaf = leaf->PopSpecial();
                 if (!j) {
                     root = leaf;
@@ -583,13 +590,13 @@ void QBdt::ApplySingle(const complex* mtrx, bitLenInt target)
             return (bitCapInt)0U;
         }
 
+        if (!leaf->branches[0] && isClifford) {
+            NODE_TO_QINTERFACE(leaf)->Mtrx(mtrx, target - j);
+
+            return (bitCapInt)(pow2(target - j) - ONE_BCI);
+        }
+
         if (!leaf->branches[0]) {
-            if (isClifford) {
-                NODE_TO_QINTERFACE(leaf)->Mtrx(mtrx, target - j);
-
-                return (bitCapInt)(pow2(target - j) - ONE_BCI);
-            }
-
             leaf = leaf->PopSpecial();
             if (!j) {
                 root = leaf;
@@ -647,9 +654,7 @@ void QBdt::ApplyControlledSingle(
     }
     isFallback &= (target == controlLen);
 
-    const bool isClifford = (controlLen > 1U) ||
-        !((IS_NORM_0(mtrx[1]) && IS_NORM_0(mtrx[2]) && IS_CTRLED_CLIFFORD(mtrx[0], mtrx[1])) ||
-            (IS_NORM_0(mtrx[0]) && IS_NORM_0(mtrx[3]) && IS_CTRLED_CLIFFORD(mtrx[1], mtrx[2])));
+    const bool isClifford = (controlLen > 1U) || !IS_CTRLED_CLIFFORD(mtrx);
 
     if (!isFallback && !isClifford) {
         FallbackMCMtrx(mtrx, controls, controlLen, target, isAnti);
@@ -693,7 +698,11 @@ void QBdt::ApplyControlledSingle(
                 // WARNING: Mutates loop control variable!
                 return (bitCapInt)(pow2(target - j) - ONE_BCI);
             }
-            if (!leaf->branches[0] && !isClifford) {
+            if (!leaf->branches[0]) {
+                if (isClifford) {
+                    break;
+                }
+
                 leaf = leaf->PopSpecial();
                 if (!j) {
                     root = leaf;
@@ -711,30 +720,29 @@ void QBdt::ApplyControlledSingle(
             return (bitCapInt)0U;
         }
 
-        if (!leaf->branches[0]) {
-            if (isClifford) {
-                std::vector<bitLenInt> ketControlsVec;
-                for (bitLenInt c = 0U; c < controlLen; c++) {
-                    const bitLenInt control = controlVec[c];
-                    if (controlVec[c] < j) {
-                        continue;
-                    }
-                    ketControlsVec.push_back(control - j);
+        if (!leaf->branches[0] && isClifford) {
+            std::vector<bitLenInt> ketControlsVec;
+            for (bitLenInt c = 0U; c < controlLen; c++) {
+                const bitLenInt control = controlVec[c];
+                if (controlVec[c] < j) {
+                    continue;
                 }
-                std::unique_ptr<bitLenInt[]> sControls =
-                    std::unique_ptr<bitLenInt[]>(new bitLenInt[ketControlsVec.size()]);
-                std::copy(ketControlsVec.begin(), ketControlsVec.end(), sControls.get());
+                ketControlsVec.push_back(control - j);
+            }
+            std::unique_ptr<bitLenInt[]> sControls = std::unique_ptr<bitLenInt[]>(new bitLenInt[ketControlsVec.size()]);
+            std::copy(ketControlsVec.begin(), ketControlsVec.end(), sControls.get());
 
-                QInterfacePtr qi = NODE_TO_QINTERFACE(leaf);
-                if (isAnti) {
-                    qi->MACMtrx(sControls.get(), ketControlsVec.size(), mtrx, target - j);
-                } else {
-                    qi->MCMtrx(sControls.get(), ketControlsVec.size(), mtrx, target - j);
-                }
-
-                return (bitCapInt)(pow2(target - j) - ONE_BCI);
+            QInterfacePtr qi = NODE_TO_QINTERFACE(leaf);
+            if (isAnti) {
+                qi->MACMtrx(sControls.get(), ketControlsVec.size(), mtrx, target - j);
+            } else {
+                qi->MCMtrx(sControls.get(), ketControlsVec.size(), mtrx, target - j);
             }
 
+            return (bitCapInt)(pow2(target - j) - ONE_BCI);
+        }
+
+        if (!leaf->branches[0]) {
             leaf = leaf->PopSpecial();
             if (!j) {
                 root = leaf;
