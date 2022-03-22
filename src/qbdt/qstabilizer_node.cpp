@@ -41,10 +41,14 @@ bool QBdtQStabilizerNode::isEqual(QBdtNodeInterfacePtr r)
     if (r->branches[0]) {
         // "this" node is "special," but "r" is not.
 
-        QBdtNodeInterfacePtr l = ShallowClone();
-        l->PopSpecial();
+        // QBdtNodeInterfacePtr l = ShallowClone();
+        // l->PopSpecial();
+        //
+        // return (l->branches[0] == r->branches[0]) && (l->branches[1] == r->branches[1]);
 
-        return (l->branches[0] == r->branches[0]) && (l->branches[1] == r->branches[1]);
+        // TODO: Handle this case, but with a tractable cost.
+
+        return false;
     }
 
     QStabilizerPtr rReg = std::dynamic_pointer_cast<QBdtQStabilizerNode>(r)->qReg;
@@ -78,10 +82,14 @@ bool QBdtQStabilizerNode::isEqualUnder(QBdtNodeInterfacePtr r)
     if (r->branches[0]) {
         // "this" node is "special," but "r" is not.
 
-        QBdtNodeInterfacePtr l = ShallowClone();
-        l->PopSpecial();
+        // QBdtNodeInterfacePtr l = ShallowClone();
+        // l->PopSpecial();
+        //
+        // return (l->branches[0] == r->branches[0]) && (l->branches[1] == r->branches[1]);
 
-        return (l->branches[0] == r->branches[0]) && (l->branches[1] == r->branches[1]);
+        // TODO: Handle this case, but with a tractable cost.
+
+        return false;
     }
 
     QStabilizerPtr rReg = std::dynamic_pointer_cast<QBdtQStabilizerNode>(r)->qReg;
