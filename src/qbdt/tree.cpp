@@ -577,7 +577,7 @@ void QBdt::ApplySingle(const complex* mtrx, bitLenInt target)
                 if (!j) {
                     root = leaf;
                 } else {
-                    parent->branches[SelectBit(i, j)] = leaf;
+                    parent->branches[SelectBit(i, target - j)] = leaf;
                 }
             }
 
@@ -590,19 +590,19 @@ void QBdt::ApplySingle(const complex* mtrx, bitLenInt target)
             return (bitCapInt)0U;
         }
 
-        if (!leaf->branches[0] && isClifford) {
-            NODE_TO_QINTERFACE(leaf)->Mtrx(mtrx, target - j);
-
-            return (bitCapInt)(pow2(target - j) - ONE_BCI);
-        }
-
-        if (!leaf->branches[0]) {
+        if (!leaf->branches[0] && !isClifford) {
             leaf = leaf->PopSpecial();
             if (!j) {
                 root = leaf;
             } else {
                 parent->branches[SelectBit(i, j)] = leaf;
             }
+        }
+
+        if (!leaf->branches[0]) {
+            NODE_TO_QINTERFACE(leaf)->Mtrx(mtrx, target - j);
+
+            return (bitCapInt)(pow2(target - j) - ONE_BCI);
         }
 
 #if ENABLE_COMPLEX_X2
@@ -653,9 +653,7 @@ void QBdt::ApplyControlledSingle(
         }
     }
     isFallback &= (target == controlLen);
-
     const bool isClifford = (controlLen > 1U) || !IS_CTRLED_CLIFFORD(mtrx);
-
     if (!isFallback && !isClifford) {
         FallbackMCMtrx(mtrx, controls, controlLen, target, isAnti);
         return;
@@ -707,7 +705,7 @@ void QBdt::ApplyControlledSingle(
                 if (!j) {
                     root = leaf;
                 } else {
-                    parent->branches[SelectBit(i, j)] = leaf;
+                    parent->branches[SelectBit(i, target - j)] = leaf;
                 }
             }
 
@@ -720,7 +718,16 @@ void QBdt::ApplyControlledSingle(
             return (bitCapInt)0U;
         }
 
-        if (!leaf->branches[0] && isClifford) {
+        if (!leaf->branches[0] && !isClifford) {
+            leaf = leaf->PopSpecial();
+            if (!j) {
+                root = leaf;
+            } else {
+                parent->branches[SelectBit(i, j)] = leaf;
+            }
+        }
+
+        if (!leaf->branches[0]) {
             std::vector<bitLenInt> ketControlsVec;
             for (bitLenInt c = 0U; c < controlLen; c++) {
                 const bitLenInt control = controlVec[c];
@@ -740,15 +747,6 @@ void QBdt::ApplyControlledSingle(
             }
 
             return (bitCapInt)(pow2(target - j) - ONE_BCI);
-        }
-
-        if (!leaf->branches[0]) {
-            leaf = leaf->PopSpecial();
-            if (!j) {
-                root = leaf;
-            } else {
-                parent->branches[SelectBit(i, j)] = leaf;
-            }
         }
 
 #if ENABLE_COMPLEX_X2
