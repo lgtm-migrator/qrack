@@ -540,7 +540,8 @@ void QBdt::ApplySingle(const complex* mtrx, bitLenInt target)
         return;
     }
 
-    if (target && !IS_CLIFFORD(mtrx)) {
+    const bool isClifford = IS_CLIFFORD(mtrx);
+    if (target && !isClifford) {
         FallbackMtrx(mtrx, target);
         return;
     }
@@ -564,7 +565,7 @@ void QBdt::ApplySingle(const complex* mtrx, bitLenInt target)
                 // WARNING: Mutates loop control variable!
                 return (bitCapInt)(pow2(target - j) - ONE_BCI);
             }
-            if (!leaf->branches[0]) {
+            if (!leaf->branches[0] && !isClifford) {
                 leaf = leaf->PopSpecial();
                 if (!j) {
                     root = leaf;
@@ -580,6 +581,21 @@ void QBdt::ApplySingle(const complex* mtrx, bitLenInt target)
 
         if (IS_NORM_0(leaf->scale)) {
             return (bitCapInt)0U;
+        }
+
+        if (!leaf->branches[0]) {
+            if (isClifford) {
+                NODE_TO_QINTERFACE(leaf)->Mtrx(mtrx, target - j);
+
+                return (bitCapInt)(pow2(target - j) - ONE_BCI);
+            }
+
+            leaf = leaf->PopSpecial();
+            if (!j) {
+                root = leaf;
+            } else {
+                parent->branches[SelectBit(i, j)] = leaf;
+            }
         }
 
 #if ENABLE_COMPLEX_X2
@@ -631,10 +647,11 @@ void QBdt::ApplyControlledSingle(
     }
     isFallback &= (target == controlLen);
 
-    if (!isFallback &&
-        ((controlLen > 1U) ||
-            !((IS_NORM_0(mtrx[1]) && IS_NORM_0(mtrx[2]) && IS_CTRLED_CLIFFORD(mtrx[0], mtrx[1])) ||
-                (IS_NORM_0(mtrx[0]) && IS_NORM_0(mtrx[3]) && IS_CTRLED_CLIFFORD(mtrx[1], mtrx[2]))))) {
+    const bool isClifford = (controlLen > 1U) ||
+        !((IS_NORM_0(mtrx[1]) && IS_NORM_0(mtrx[2]) && IS_CTRLED_CLIFFORD(mtrx[0], mtrx[1])) ||
+            (IS_NORM_0(mtrx[0]) && IS_NORM_0(mtrx[3]) && IS_CTRLED_CLIFFORD(mtrx[1], mtrx[2])));
+
+    if (!isFallback && !isClifford) {
         FallbackMCMtrx(mtrx, controls, controlLen, target, isAnti);
         return;
     }
@@ -676,7 +693,7 @@ void QBdt::ApplyControlledSingle(
                 // WARNING: Mutates loop control variable!
                 return (bitCapInt)(pow2(target - j) - ONE_BCI);
             }
-            if (!leaf->branches[0]) {
+            if (!leaf->branches[0] && !isClifford) {
                 leaf = leaf->PopSpecial();
                 if (!j) {
                     root = leaf;
@@ -692,6 +709,38 @@ void QBdt::ApplyControlledSingle(
 
         if (IS_NORM_0(leaf->scale)) {
             return (bitCapInt)0U;
+        }
+
+        if (!leaf->branches[0]) {
+            if (isClifford) {
+                std::vector<bitLenInt> ketControlsVec;
+                for (bitLenInt c = 0U; c < controlLen; c++) {
+                    const bitLenInt control = controlVec[c];
+                    if (controlVec[c] < j) {
+                        continue;
+                    }
+                    ketControlsVec.push_back(control - j);
+                }
+                std::unique_ptr<bitLenInt[]> sControls =
+                    std::unique_ptr<bitLenInt[]>(new bitLenInt[ketControlsVec.size()]);
+                std::copy(ketControlsVec.begin(), ketControlsVec.end(), sControls.get());
+
+                QInterfacePtr qi = NODE_TO_QINTERFACE(leaf);
+                if (isAnti) {
+                    qi->MACMtrx(sControls.get(), ketControlsVec.size(), mtrx, target - j);
+                } else {
+                    qi->MCMtrx(sControls.get(), ketControlsVec.size(), mtrx, target - j);
+                }
+
+                return (bitCapInt)(pow2(target - j) - ONE_BCI);
+            }
+
+            leaf = leaf->PopSpecial();
+            if (!j) {
+                root = leaf;
+            } else {
+                parent->branches[SelectBit(i, j)] = leaf;
+            }
         }
 
 #if ENABLE_COMPLEX_X2
