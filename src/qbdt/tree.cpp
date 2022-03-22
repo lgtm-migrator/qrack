@@ -622,7 +622,8 @@ void QBdt::ApplyControlledSingle(
         return;
     }
 
-    if (!((IS_NORM_0(mtrx[1]) && IS_NORM_0(mtrx[2]) && IS_CTRLED_CLIFFORD(mtrx[0], mtrx[1])) ||
+    if ((controlLen > 1U) ||
+        !((IS_NORM_0(mtrx[1]) && IS_NORM_0(mtrx[2]) && IS_CTRLED_CLIFFORD(mtrx[0], mtrx[1])) ||
             (IS_NORM_0(mtrx[0]) && IS_NORM_0(mtrx[3]) && IS_CTRLED_CLIFFORD(mtrx[1], mtrx[2])))) {
         FallbackMCMtrx(mtrx, controls, controlLen, target, isAnti);
         return;
