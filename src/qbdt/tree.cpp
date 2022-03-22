@@ -540,7 +540,7 @@ void QBdt::ApplySingle(const complex* mtrx, bitLenInt target)
         return;
     }
 
-    if (!IS_CLIFFORD(mtrx)) {
+    if (target && !IS_CLIFFORD(mtrx)) {
         FallbackMtrx(mtrx, target);
         return;
     }
@@ -622,9 +622,19 @@ void QBdt::ApplyControlledSingle(
         return;
     }
 
-    if ((controlLen > 1U) ||
-        !((IS_NORM_0(mtrx[1]) && IS_NORM_0(mtrx[2]) && IS_CTRLED_CLIFFORD(mtrx[0], mtrx[1])) ||
-            (IS_NORM_0(mtrx[0]) && IS_NORM_0(mtrx[3]) && IS_CTRLED_CLIFFORD(mtrx[1], mtrx[2])))) {
+    bool isFallback = true;
+    for (bitLenInt i = 0; i < controlLen; i++) {
+        if (controls[i] != i) {
+            isFallback = false;
+            break;
+        }
+    }
+    isFallback &= (target == controlLen);
+
+    if (!isFallback &&
+        ((controlLen > 1U) ||
+            !((IS_NORM_0(mtrx[1]) && IS_NORM_0(mtrx[2]) && IS_CTRLED_CLIFFORD(mtrx[0], mtrx[1])) ||
+                (IS_NORM_0(mtrx[0]) && IS_NORM_0(mtrx[3]) && IS_CTRLED_CLIFFORD(mtrx[1], mtrx[2]))))) {
         FallbackMCMtrx(mtrx, controls, controlLen, target, isAnti);
         return;
     }
