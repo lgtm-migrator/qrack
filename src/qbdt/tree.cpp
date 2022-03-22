@@ -551,9 +551,6 @@ void QBdt::ApplySingle(const complex* mtrx, bitLenInt target)
 
     const bitCapInt qPower = pow2(target);
 
-    std::map<QInterfacePtr, bitLenInt> qis;
-    std::set<QBdtNodeInterfacePtr> qns;
-
 #if ENABLE_COMPLEX_X2
     const complex2 mtrxCol1(mtrx[0], mtrx[2]);
     const complex2 mtrxCol2(mtrx[1], mtrx[3]);
@@ -600,6 +597,7 @@ void QBdt::ApplySingle(const complex* mtrx, bitLenInt target)
         }
 
         if (!leaf->branches[0]) {
+            leaf->Branch();
             NODE_TO_QINTERFACE(leaf)->Mtrx(mtrx, target - j);
 
             return (bitCapInt)(pow2(target - j) - ONE_BCI);
@@ -610,7 +608,6 @@ void QBdt::ApplySingle(const complex* mtrx, bitLenInt target)
 #else
         leaf->Apply2x2(mtrx, qubitCount - target);
 #endif
-        qns.insert(leaf);
 
         return (bitCapInt)0U;
     });
@@ -680,9 +677,6 @@ void QBdt::ApplyControlledSingle(
     const complex2 mtrxCol2(mtrx[1], mtrx[3]);
 #endif
 
-    std::map<QInterfacePtr, bitLenInt> qis;
-    std::set<QBdtNodeInterfacePtr> qns;
-
     par_for_qbdt(0, qPower, [&](const bitCapInt& i, const int& cpu) {
         if ((i & controlMask) != controlPerm) {
             return (bitCapInt)(controlMask - ONE_BCI);
@@ -728,6 +722,8 @@ void QBdt::ApplyControlledSingle(
         }
 
         if (!leaf->branches[0]) {
+            leaf->Branch();
+
             std::vector<bitLenInt> ketControlsVec;
             for (bitLenInt c = 0U; c < controlLen; c++) {
                 const bitLenInt control = controlVec[c];
@@ -754,7 +750,6 @@ void QBdt::ApplyControlledSingle(
 #else
         leaf->Apply2x2(mtrx, qubitCount - target);
 #endif
-        qns.insert(leaf);
 
         return (bitCapInt)0U;
     });
