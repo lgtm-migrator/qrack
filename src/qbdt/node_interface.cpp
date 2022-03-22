@@ -61,8 +61,11 @@ bool QBdtNodeInterface::isEqual(QBdtNodeInterfacePtr r)
     const bool isMismatchedSpecial = branches[0] && !r->branches[0];
     if (isMismatchedSpecial) {
         // "this" node is not "special," but "r" is.
-        r = r->ShallowClone();
-        r->PopSpecial();
+        // r = r->ShallowClone();
+        // r->PopSpecial();
+        // TODO: Handle this case, but with a tractable cost.
+
+        return false;
     }
 
     if (branches[0] != r->branches[0]) {
@@ -94,10 +97,17 @@ bool QBdtNodeInterface::isEqualUnder(QBdtNodeInterfacePtr r)
         return true;
     }
 
-    if (branches[0] && !r->branches[0] && !IS_NORM_0(r->scale)) {
+    if (IS_NORM_0(scale)) {
+        return IS_NORM_0(r->scale);
+    }
+
+    if (branches[0] && !r->branches[0]) {
         // "this" node is not "special," but "r" is.
-        r = r->ShallowClone();
-        r->PopSpecial();
+        // r = r->ShallowClone();
+        // r->PopSpecial();
+        // TODO: Handle this case, but with a tractable cost.
+
+        return false;
     }
 
     if (branches[0] != r->branches[0]) {
