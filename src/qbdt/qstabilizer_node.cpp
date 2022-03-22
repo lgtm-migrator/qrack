@@ -158,11 +158,8 @@ QBdtNodeInterfacePtr QBdtQStabilizerNode::PopSpecial()
             qn[1] = std::make_shared<QBdtQStabilizerNode>(amps[1], q[0]);
         }
 
-        qn[0]->Prune();
-        qn[1]->Prune();
-
         QBdtNodePtr toRet = std::make_shared<QBdtNode>(scale, qn);
-        toRet->Prune();
+        toRet->Prune(2U);
 
         return toRet;
     }
