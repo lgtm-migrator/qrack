@@ -448,13 +448,13 @@ bool QBdt::ForceM(bitLenInt qubit, bool result, bool doForce, bool doApply)
 
         if (result) {
             if (IS_NORM_0(b1->scale)) {
-                throw std::runtime_error("ForceM() forced 0 probability!");
+                throw std::runtime_error("QBdt::ForceM() forced 0 probability!");
             }
             b0->SetZero();
             b1->scale /= abs(b1->scale);
         } else {
             if (IS_NORM_0(b0->scale)) {
-                throw std::runtime_error("ForceM() forced 0 probability!");
+                throw std::runtime_error("QBdt::ForceM() forced 0 probability!");
             }
             b0->scale /= abs(b0->scale);
             b1->SetZero();
@@ -507,6 +507,17 @@ bitCapInt QBdt::MAll()
     return result;
 }
 
+#define IS_REAL_0(r) (abs(r) <= FP_NORM_EPSILON)
+#define IS_CTRLED_CLIFFORD(top, bottom)                                                                                \
+    ((IS_REAL_0(std::real(top)) || IS_REAL_0(std::imag(top))) && (IS_SAME(top, bottom) || IS_SAME(top, -bottom)))
+#define IS_CLIFFORD(mtrx)                                                                                              \
+    (IS_SAME(mtrx[0], mtrx[1]) || IS_SAME(mtrx[0], -mtrx[1]) || IS_SAME(mtrx[0], I_CMPLX * mtrx[1]) ||                 \
+        IS_SAME(mtrx[0], -I_CMPLX * mtrx[1])) &&                                                                       \
+        (IS_SAME(mtrx[0], mtrx[2]) || IS_SAME(mtrx[0], -mtrx[2]) || IS_SAME(mtrx[0], I_CMPLX * mtrx[2]) ||             \
+            IS_SAME(mtrx[0], -I_CMPLX * mtrx[2])) &&                                                                   \
+        (IS_SAME(mtrx[0], mtrx[3]) || IS_SAME(mtrx[0], -mtrx[3]) || IS_SAME(mtrx[0], I_CMPLX * mtrx[3]) ||             \
+            IS_SAME(mtrx[0], -I_CMPLX * mtrx[3]))
+
 void QBdt::ApplySingle(const complex* mtrx, bitLenInt target)
 {
     if (IS_NORM_0(mtrx[1]) && IS_NORM_0(mtrx[2]) && (randGlobalPhase || IS_NORM_0(ONE_CMPLX - mtrx[0])) &&
@@ -529,11 +540,15 @@ void QBdt::ApplySingle(const complex* mtrx, bitLenInt target)
         return;
     }
 
+    if (!IS_CLIFFORD(mtrx)) {
+        FallbackMtrx(mtrx, target);
+        return;
+    }
+
     const bitCapInt qPower = pow2(target);
 
     std::map<QInterfacePtr, bitLenInt> qis;
     std::set<QBdtNodeInterfacePtr> qns;
-    bool isFail = false;
 
 #if ENABLE_COMPLEX_X2
     const complex2 mtrxCol1(mtrx[0], mtrx[2]);
@@ -550,8 +565,14 @@ void QBdt::ApplySingle(const complex* mtrx, bitLenInt target)
                 return (bitCapInt)(pow2(target - j) - ONE_BCI);
             }
             if (!leaf->branches[0]) {
-                break;
+                leaf = leaf->PopSpecial();
+                if (!j) {
+                    root = leaf;
+                } else {
+                    parent->branches[SelectBit(i, j)] = leaf;
+                }
             }
+
             leaf->Branch();
             parent = leaf;
             leaf = leaf->branches[SelectBit(i, target - (j + 1U))];
@@ -561,65 +582,17 @@ void QBdt::ApplySingle(const complex* mtrx, bitLenInt target)
             return (bitCapInt)0U;
         }
 
-        if ((j == target) && leaf->branches[0]) {
 #if ENABLE_COMPLEX_X2
-            leaf->Apply2x2(mtrxCol1, mtrxCol2, qubitCount - target);
+        leaf->Apply2x2(mtrxCol1, mtrxCol2, qubitCount - target);
 #else
-            leaf->Apply2x2(mtrx, qubitCount - target);
+        leaf->Apply2x2(mtrx, qubitCount - target);
 #endif
-            qns.insert(leaf);
+        qns.insert(leaf);
 
-            return (bitCapInt)0U;
-        }
-
-        leaf->Branch();
-        QInterfacePtr qi = NODE_TO_QINTERFACE(leaf);
-        const bitLenInt sTarget = target - j;
-        try {
-            qi->Mtrx(mtrx, sTarget);
-        } catch (const std::domain_error&) {
-            isFail = true;
-
-            return (bitCapInt)(qPower - ONE_BCI);
-        }
-        qis[qi] = j;
-
-        return (bitCapInt)(pow2(target - j) - ONE_BCI);
+        return (bitCapInt)0U;
     });
 
-    if (!isFail) {
-        root->Prune(target);
-
-        return;
-    }
-
-    complex iMtrx[4];
-    inv2x2(mtrx, iMtrx);
-
-    std::map<QInterfacePtr, bitLenInt>::iterator it = qis.begin();
-    while (it != qis.end()) {
-        it->first->Mtrx(iMtrx, target - it->second);
-        it++;
-    }
-
-#if ENABLE_COMPLEX_X2
-    const complex2 iMtrxCol1(iMtrx[0], iMtrx[2]);
-    const complex2 iMtrxCol2(iMtrx[1], iMtrx[3]);
-#endif
-
-    std::set<QBdtNodeInterfacePtr>::iterator itn = qns.begin();
-    while (itn != qns.end()) {
-#if ENABLE_COMPLEX_X2
-        (*itn)->Apply2x2(iMtrxCol1, iMtrxCol2, qubitCount - target);
-#else
-        (*itn)->Apply2x2(iMtrx, qubitCount - target);
-#endif
-        itn++;
-    }
-
     root->Prune(target);
-
-    FallbackMtrx(mtrx, target);
 }
 
 void QBdt::ApplyControlledSingle(
@@ -649,6 +622,12 @@ void QBdt::ApplyControlledSingle(
         return;
     }
 
+    if (!((IS_NORM_0(mtrx[1]) && IS_NORM_0(mtrx[2]) && IS_CTRLED_CLIFFORD(mtrx[0], mtrx[1])) ||
+            (IS_NORM_0(mtrx[0]) && IS_NORM_0(mtrx[3]) && IS_CTRLED_CLIFFORD(mtrx[1], mtrx[2])))) {
+        FallbackMCMtrx(mtrx, controls, controlLen, target, isAnti);
+        return;
+    }
+
     std::vector<bitLenInt> controlVec(controlLen);
     std::copy(controls, controls + controlLen, controlVec.begin());
     std::sort(controlVec.begin(), controlVec.end());
@@ -672,7 +651,6 @@ void QBdt::ApplyControlledSingle(
 
     std::map<QInterfacePtr, bitLenInt> qis;
     std::set<QBdtNodeInterfacePtr> qns;
-    bool isFail = false;
 
     par_for_qbdt(0, qPower, [&](const bitCapInt& i, const int& cpu) {
         if ((i & controlMask) != controlPerm) {
@@ -688,7 +666,12 @@ void QBdt::ApplyControlledSingle(
                 return (bitCapInt)(pow2(target - j) - ONE_BCI);
             }
             if (!leaf->branches[0]) {
-                break;
+                leaf = leaf->PopSpecial();
+                if (!j) {
+                    root = leaf;
+                } else {
+                    parent->branches[SelectBit(i, j)] = leaf;
+                }
             }
 
             leaf->Branch();
@@ -700,103 +683,21 @@ void QBdt::ApplyControlledSingle(
             return (bitCapInt)0U;
         }
 
-        if ((j == target) && leaf->branches[0]) {
 #if ENABLE_COMPLEX_X2
-            leaf->Apply2x2(mtrxCol1, mtrxCol2, qubitCount - target);
+        leaf->Apply2x2(mtrxCol1, mtrxCol2, qubitCount - target);
 #else
-            leaf->Apply2x2(mtrx, qubitCount - target);
+        leaf->Apply2x2(mtrx, qubitCount - target);
 #endif
-            qns.insert(leaf);
+        qns.insert(leaf);
 
-            return (bitCapInt)0U;
-        }
-
-        const bitLenInt sTarget = target - j;
-        std::vector<bitLenInt> ketControlsVec;
-        for (bitLenInt c = 0U; c < controlLen; c++) {
-            const bitLenInt control = controlVec[c];
-            if (controlVec[c] < j) {
-                continue;
-            }
-            ketControlsVec.push_back(control - j);
-        }
-        std::unique_ptr<bitLenInt[]> sControls = std::unique_ptr<bitLenInt[]>(new bitLenInt[ketControlsVec.size()]);
-        std::copy(ketControlsVec.begin(), ketControlsVec.end(), sControls.get());
-
-        leaf->Branch();
-        QInterfacePtr qi = NODE_TO_QINTERFACE(leaf);
-        try {
-            if (isAnti) {
-                qi->MACMtrx(sControls.get(), ketControlsVec.size(), mtrx, sTarget);
-            } else {
-                qi->MCMtrx(sControls.get(), ketControlsVec.size(), mtrx, sTarget);
-            }
-        } catch (const std::domain_error&) {
-            isFail = true;
-
-            return (bitCapInt)(qPower - ONE_BCI);
-        }
-        qis[qi] = j;
-
-        return (bitCapInt)(pow2(target - j) - ONE_BCI);
+        return (bitCapInt)0U;
     });
-
-    if (!isFail) {
-        root->Prune(target);
-        // Undo isSwapped.
-        if (isSwapped) {
-            Swap(target, controlVec.back());
-            std::swap(target, controlVec.back());
-        }
-
-        return;
-    }
-
-    complex iMtrx[4];
-    inv2x2(mtrx, iMtrx);
-
-    std::map<QInterfacePtr, bitLenInt>::iterator iti = qis.begin();
-    while (iti != qis.end()) {
-        std::vector<bitLenInt> ketControlsVec;
-        for (bitLenInt c = 0U; c < controlLen; c++) {
-            const bitLenInt control = controlVec[c];
-            if (control < iti->second) {
-                continue;
-            }
-            ketControlsVec.push_back(control - iti->second);
-        }
-        std::unique_ptr<bitLenInt[]> sControls = std::unique_ptr<bitLenInt[]>(new bitLenInt[ketControlsVec.size()]);
-        std::copy(ketControlsVec.begin(), ketControlsVec.end(), sControls.get());
-        if (isAnti) {
-            iti->first->MACMtrx(sControls.get(), ketControlsVec.size(), iMtrx, target - iti->second);
-        } else {
-            iti->first->MCMtrx(sControls.get(), ketControlsVec.size(), iMtrx, target - iti->second);
-        }
-        iti++;
-    }
-
-#if ENABLE_COMPLEX_X2
-    const complex2 iMtrxCol1(iMtrx[0], iMtrx[2]);
-    const complex2 iMtrxCol2(iMtrx[1], iMtrx[3]);
-#endif
-
-    std::set<QBdtNodeInterfacePtr>::iterator itn = qns.begin();
-    while (itn != qns.end()) {
-#if ENABLE_COMPLEX_X2
-        (*itn)->Apply2x2(iMtrxCol1, iMtrxCol2, qubitCount - target);
-#else
-        (*itn)->Apply2x2(iMtrx, qubitCount - target);
-#endif
-        itn++;
-    }
 
     root->Prune(target);
     // Undo isSwapped.
     if (isSwapped) {
         Swap(target, controlVec.back());
     }
-
-    FallbackMCMtrx(mtrx, controls, controlLen, target, isAnti);
 }
 
 void QBdt::Mtrx(const complex* mtrx, bitLenInt target) { ApplySingle(mtrx, target); }
