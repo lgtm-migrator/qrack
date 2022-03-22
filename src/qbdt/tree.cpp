@@ -46,57 +46,6 @@ QStabilizerPtr QBdt::MakeQStabilizer(bitLenInt qbCount, bitCapInt perm)
             randGlobalPhase, false, devID, hardware_rand_generator != NULL, false, amplitudeFloor));
 }
 
-void QBdt::FallbackMtrx(const complex* mtrx, bitLenInt target)
-{
-    if (!root->branches[0]) {
-        root = root->PopSpecial();
-    }
-
-    Swap(0U, target);
-    Mtrx(mtrx, 0U);
-    Swap(0U, target);
-}
-
-void QBdt::FallbackMCMtrx(
-    const complex* mtrx, const bitLenInt* controls, bitLenInt controlLen, bitLenInt target, bool isAnti)
-{
-    const bitLenInt gateQubitCount = controlLen + 1U;
-    const bitCapInt gatePower = pow2(gateQubitCount);
-    for (bitCapInt i = 0; i < gatePower; i++) {
-        QBdtNodeInterfacePtr leaf = root;
-        QBdtNodeInterfacePtr parent = NULL;
-        for (bitLenInt j = 0; j < gateQubitCount; j++) {
-            if (IS_NORM_0(leaf->scale)) {
-                break;
-            }
-            if (!leaf->branches[0]) {
-                leaf = leaf->PopSpecial();
-                if (!j) {
-                    root = leaf;
-                } else {
-                    parent->branches[SelectBit(i, (j - 1U))] = leaf;
-                }
-            }
-            parent = leaf;
-            leaf = leaf->branches[SelectBit(i, j)];
-        }
-    }
-
-    std::unique_ptr<bitLenInt[]> lControls(new bitLenInt[controlLen]);
-    for (bitLenInt i = 0U; i < controlLen; i++) {
-        lControls[i] = i;
-        Swap(i, controls[i]);
-    }
-    Swap(controlLen, target);
-
-    ApplyControlledSingle(mtrx, lControls.get(), controlLen, controlLen, isAnti);
-
-    Swap(controlLen, target);
-    for (bitLenInt i = 0U; i < controlLen; i++) {
-        Swap(i, controls[i]);
-    }
-}
-
 void QBdt::SetPermutation(bitCapInt initState, complex phaseFac)
 {
     if (!qubitCount) {
@@ -550,7 +499,6 @@ void QBdt::ApplySingle(const complex* mtrx, bitLenInt target)
     }
 
     const bitCapInt qPower = pow2(target);
-
 #if ENABLE_COMPLEX_X2
     const complex2 mtrxCol1(mtrx[0], mtrx[2]);
     const complex2 mtrxCol2(mtrx[1], mtrx[3]);
@@ -566,16 +514,7 @@ void QBdt::ApplySingle(const complex* mtrx, bitLenInt target)
                 return (bitCapInt)(pow2(target - j) - ONE_BCI);
             }
             if (!leaf->branches[0]) {
-                if (isClifford) {
-                    break;
-                }
-
-                leaf = leaf->PopSpecial();
-                if (!j) {
-                    root = leaf;
-                } else {
-                    parent->branches[SelectBit(i, target - j)] = leaf;
-                }
+                break;
             }
 
             leaf->Branch();
@@ -585,15 +524,6 @@ void QBdt::ApplySingle(const complex* mtrx, bitLenInt target)
 
         if (IS_NORM_0(leaf->scale)) {
             return (bitCapInt)0U;
-        }
-
-        if (!leaf->branches[0] && !isClifford) {
-            leaf = leaf->PopSpecial();
-            if (!j) {
-                root = leaf;
-            } else {
-                parent->branches[SelectBit(i, j)] = leaf;
-            }
         }
 
         if (!leaf->branches[0]) {
@@ -691,16 +621,7 @@ void QBdt::ApplyControlledSingle(
                 return (bitCapInt)(pow2(target - j) - ONE_BCI);
             }
             if (!leaf->branches[0]) {
-                if (isClifford) {
-                    break;
-                }
-
-                leaf = leaf->PopSpecial();
-                if (!j) {
-                    root = leaf;
-                } else {
-                    parent->branches[SelectBit(i, target - j)] = leaf;
-                }
+                break;
             }
 
             leaf->Branch();
@@ -710,15 +631,6 @@ void QBdt::ApplyControlledSingle(
 
         if (IS_NORM_0(leaf->scale)) {
             return (bitCapInt)0U;
-        }
-
-        if (!leaf->branches[0] && !isClifford) {
-            leaf = leaf->PopSpecial();
-            if (!j) {
-                root = leaf;
-            } else {
-                parent->branches[SelectBit(i, j)] = leaf;
-            }
         }
 
         if (!leaf->branches[0]) {
@@ -758,6 +670,129 @@ void QBdt::ApplyControlledSingle(
     // Undo isSwapped.
     if (isSwapped) {
         Swap(target, controlVec.back());
+    }
+}
+
+void QBdt::FallbackMtrx(const complex* mtrx, bitLenInt target)
+{
+    if (!root->branches[0]) {
+        root = root->PopSpecial();
+    }
+
+    Swap(0U, target);
+
+    const bitCapInt qPower = pow2(target);
+#if ENABLE_COMPLEX_X2
+    const complex2 mtrxCol1(mtrx[0], mtrx[2]);
+    const complex2 mtrxCol2(mtrx[1], mtrx[3]);
+#endif
+
+    par_for_qbdt(0, qPower, [&](const bitCapInt& i, const int& cpu) {
+        QBdtNodeInterfacePtr leaf = root;
+        bitLenInt j;
+        QBdtNodeInterfacePtr parent = NULL;
+        for (j = 0; j < target; j++) {
+            if (IS_NORM_0(leaf->scale)) {
+                // WARNING: Mutates loop control variable!
+                return (bitCapInt)(pow2(target - j) - ONE_BCI);
+            }
+
+            leaf->Branch();
+            parent = leaf;
+            leaf = leaf->branches[SelectBit(i, target - (j + 1U))];
+        }
+
+        if (IS_NORM_0(leaf->scale)) {
+            return (bitCapInt)0U;
+        }
+
+#if ENABLE_COMPLEX_X2
+        leaf->Apply2x2(mtrxCol1, mtrxCol2, qubitCount - target);
+#else
+        leaf->Apply2x2(mtrx, qubitCount - target);
+#endif
+
+        return (bitCapInt)0U;
+    });
+
+    Swap(0U, target);
+}
+
+void QBdt::FallbackMCMtrx(
+    const complex* mtrx, const bitLenInt* controls, bitLenInt controlLen, bitLenInt target, bool isAnti)
+{
+    const bitLenInt gateQubitCount = controlLen + 1U;
+    const bitCapInt gatePower = pow2(gateQubitCount);
+    for (bitCapInt i = 0; i < gatePower; i++) {
+        QBdtNodeInterfacePtr leaf = root;
+        QBdtNodeInterfacePtr parent = NULL;
+        for (bitLenInt j = 0; j < gateQubitCount; j++) {
+            if (IS_NORM_0(leaf->scale)) {
+                break;
+            }
+            if (!leaf->branches[0]) {
+                leaf = leaf->PopSpecial();
+                if (!j) {
+                    root = leaf;
+                } else {
+                    parent->branches[SelectBit(i, (j - 1U))] = leaf;
+                }
+            }
+            parent = leaf;
+            leaf = leaf->branches[SelectBit(i, j)];
+        }
+    }
+
+    std::unique_ptr<bitLenInt[]> lControls(new bitLenInt[controlLen]);
+    for (bitLenInt i = 0U; i < controlLen; i++) {
+        lControls[i] = i;
+        Swap(i, controls[i]);
+    }
+    Swap(controlLen, target);
+
+    const bitCapInt controlMask = pow2(controlLen) - ONE_BCI;
+    const bitCapInt controlPerm = isAnti ? 0U : controlMask;
+    const bitCapInt qPower = pow2(target);
+#if ENABLE_COMPLEX_X2
+    const complex2 mtrxCol1(mtrx[0], mtrx[2]);
+    const complex2 mtrxCol2(mtrx[1], mtrx[3]);
+#endif
+
+    par_for_qbdt(0, qPower, [&](const bitCapInt& i, const int& cpu) {
+        if ((i & controlMask) != controlPerm) {
+            return (bitCapInt)(controlMask - ONE_BCI);
+        }
+
+        QBdtNodeInterfacePtr leaf = root;
+        QBdtNodeInterfacePtr parent = NULL;
+        bitLenInt j;
+        for (j = 0; j < target; j++) {
+            if (IS_NORM_0(leaf->scale)) {
+                // WARNING: Mutates loop control variable!
+                return (bitCapInt)(pow2(target - j) - ONE_BCI);
+            }
+
+            leaf->Branch();
+            parent = leaf;
+            leaf = leaf->branches[SelectBit(i, target - (j + 1U))];
+        }
+
+        if (IS_NORM_0(leaf->scale)) {
+            return (bitCapInt)0U;
+        }
+
+#if ENABLE_COMPLEX_X2
+        leaf->Apply2x2(mtrxCol1, mtrxCol2, qubitCount - target);
+#else
+        leaf->Apply2x2(mtrx, qubitCount - target);
+#endif
+
+        return (bitCapInt)0U;
+    });
+
+    Swap(controlLen, target);
+    for (bitLenInt i = 0U; i < controlLen; i++) {
+        Swap(i, controls[i]);
     }
 }
 
