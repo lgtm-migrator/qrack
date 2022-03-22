@@ -1023,6 +1023,47 @@ real1_f QStabilizer::ApproxCompareHelper(QStabilizerPtr toCompare, bool isDiscre
     return ONE_R1 - clampProb(norm(proj));
 }
 
+bool QStabilizer::ApproxCompare(QStabilizerPtr toCompare, real1_f error_tol)
+{
+    if (!toCompare) {
+        return ONE_R1;
+    }
+
+    if (this == toCompare.get()) {
+        return ZERO_R1;
+    }
+
+    // If the qubit counts are unequal, these can't be approximately equal objects.
+    if (qubitCount != toCompare->qubitCount) {
+        // Max square difference:
+        return ONE_R1;
+    }
+
+    toCompare->Finish();
+    Finish();
+
+    bool isEqual = true;
+    if (gaussian() != toCompare->gaussian()) {
+        isEqual = false;
+    }
+
+    if (isEqual) {
+        const bitLenInt elemCount = qubitCount << 1U;
+        for (bitLenInt i = 0; isEqual && (i < elemCount); i++) {
+            if ((r[i] != toCompare->r[i]) || (x[i] != toCompare->x[i]) || (z[i] != toCompare->z[i])) {
+                isEqual = false;
+            }
+        }
+    }
+
+    if (isEqual || (error_tol <= TRYDECOMPOSE_EPSILON)) {
+        return isEqual;
+    }
+
+    // Standard form (after Gaussian elimination) is technically non-unique, so try this, if the check above fails:
+    return error_tol >= ApproxCompareHelper(std::dynamic_pointer_cast<QStabilizer>(toCompare), true, error_tol);
+}
+
 real1_f QStabilizer::Prob(bitLenInt qubit)
 {
     if (IsSeparableZ(qubit)) {

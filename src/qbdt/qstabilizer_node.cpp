@@ -252,9 +252,7 @@ void QBdtQStabilizerNode::Branch(bitLenInt depth)
         return;
     }
 
-    if (qReg) {
-        qReg = std::dynamic_pointer_cast<QStabilizer>(qReg->Clone());
-    }
+    qReg = std::dynamic_pointer_cast<QStabilizer>(qReg->Clone());
 }
 
 void QBdtQStabilizerNode::Prune(bitLenInt depth)

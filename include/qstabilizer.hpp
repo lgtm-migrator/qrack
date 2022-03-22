@@ -367,8 +367,9 @@ public:
     }
     virtual bool ApproxCompare(QInterfacePtr toCompare, real1_f error_tol = TRYDECOMPOSE_EPSILON)
     {
-        return error_tol >= ApproxCompareHelper(std::dynamic_pointer_cast<QStabilizer>(toCompare), true, error_tol);
+        return ApproxCompare(std::dynamic_pointer_cast<QStabilizer>(toCompare), error_tol);
     }
+    virtual bool ApproxCompare(QStabilizerPtr toCompare, real1_f error_tol = TRYDECOMPOSE_EPSILON);
 
     virtual real1_f Prob(bitLenInt qubit);
 
