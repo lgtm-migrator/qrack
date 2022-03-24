@@ -317,9 +317,7 @@ void QBdt::DecomposeDispose(bitLenInt start, bitLenInt length, QBdtPtr dest)
 
 real1_f QBdt::Prob(bitLenInt qubit)
 {
-    if (shards[qubit] && !shards[qubit]->IsPhase()) {
-        FlushBuffer(qubit);
-    }
+    FlushBuffer(qubit);
 
     if (stateVec) {
         return stateVec->Prob(qubit);
@@ -393,9 +391,7 @@ real1_f QBdt::ProbAll(bitCapInt perm)
 
 bool QBdt::ForceM(bitLenInt qubit, bool result, bool doForce, bool doApply)
 {
-    if (shards[qubit] && !shards[qubit]->IsPhase()) {
-        FlushBuffer(qubit);
-    }
+    FlushBuffer(qubit);
 
     if (stateVec) {
         return stateVec->ForceM(qubit, result, doForce, doApply);
@@ -473,11 +469,7 @@ bool QBdt::ForceM(bitLenInt qubit, bool result, bool doForce, bool doApply)
 
 bitCapInt QBdt::MAll()
 {
-    for (bitLenInt i = 0; i < qubitCount; i++) {
-        if (shards[i] && !shards[i]->IsPhase()) {
-            FlushBuffer(i);
-        }
-    }
+    FlushBuffers();
 
     if (stateVec) {
         return stateVec->MAll();
