@@ -26,6 +26,7 @@ QBdt::QBdt(std::vector<QInterfaceEngine> eng, bitLenInt qBitCount, bitCapInt ini
     , engines(eng)
     , devID(deviceId)
     , root(NULL)
+    , shards(qBitCount)
 {
 #if ENABLE_PTHREAD
     SetConcurrency(std::thread::hardware_concurrency());
@@ -44,6 +45,27 @@ QStabilizerPtr QBdt::MakeQStabilizer(bitLenInt qbCount, bitCapInt perm)
     return std::dynamic_pointer_cast<QStabilizer>(
         CreateQuantumInterface({ QINTERFACE_STABILIZER }, qbCount, perm, rand_generator, ONE_CMPLX, doNormalize,
             randGlobalPhase, false, devID, hardware_rand_generator != NULL, false, amplitudeFloor));
+}
+
+void QBdt::FlushControlled(const bitLenInt* controls, bitLenInt controlLen, bitLenInt target)
+{
+    FlushBuffer(target);
+    for (bitLenInt i = 0U; i < controlLen; i++) {
+        if (!shards[controls[i]] || !shards[controls[i]]->IsPhase()) {
+            FlushBuffer(controls[i]);
+        }
+    }
+}
+
+void QBdt::FlushBuffer(bitLenInt i)
+{
+    MpsShardPtr shard = shards[i];
+    if (!shard) {
+        return;
+    }
+    shards[i] = NULL;
+
+    ApplySingle(shard->gate, i);
 }
 
 void QBdt::SetPermutation(bitCapInt initState, complex phaseFac)
@@ -77,12 +99,19 @@ QInterfacePtr QBdt::Clone()
     ResetStateVector();
 
     copyPtr->root = root ? root->ShallowClone() : NULL;
+    for (bitLenInt i = 0; i < qubitCount; i++) {
+        if (shards[i]) {
+            copyPtr->shards[i] = shards[i]->Clone();
+        }
+    }
 
     return copyPtr;
 }
 
 template <typename Fn> void QBdt::GetTraversal(Fn getLambda)
 {
+    FlushBuffers();
+
     for (bitCapInt i = 0; i < maxQPower; i++) {
         QBdtNodeInterfacePtr leaf = root;
         complex scale = leaf->scale;
@@ -175,7 +204,9 @@ real1_f QBdt::SumSqrDiff(QBdtPtr toCompare)
         return ONE_R1;
     }
 
+    FlushBuffers();
     ResetStateVector();
+    toCompare->FlushBuffers();
     toCompare->ResetStateVector();
 
     complex projection = ZERO_CMPLX;
@@ -213,6 +244,8 @@ real1_f QBdt::SumSqrDiff(QBdtPtr toCompare)
 
 complex QBdt::GetAmplitude(bitCapInt perm)
 {
+    FlushBuffers();
+
     if (stateVec) {
         return stateVec->GetAmplitude(perm);
     }
@@ -243,6 +276,15 @@ bitLenInt QBdt::Compose(QBdtPtr toCopy, bitLenInt start)
     root->InsertAtDepth(toCopy->root, start, toCopy->qubitCount);
     SetQubitCount(qubitCount + toCopy->qubitCount);
 
+    // Resize the shards buffer.
+    shards.insert(shards.end(), toCopy->shards.begin(), toCopy->shards.end());
+    // Split the common shared_ptr references, with toCopy.
+    for (bitLenInt i = 0U; i < toCopy->qubitCount; i++) {
+        if (shards[start + i]) {
+            shards[start + i] = shards[start + i]->Clone();
+        }
+    }
+
     return start;
 }
 
@@ -263,16 +305,22 @@ void QBdt::DecomposeDispose(bitLenInt start, bitLenInt length, QBdtPtr dest)
     if (dest) {
         dest->ResetStateVector();
         dest->root = root->RemoveSeparableAtDepth(start, length);
+        std::copy(shards.begin() + start, shards.begin() + start + length, dest->shards.begin());
     } else {
         root->RemoveSeparableAtDepth(start, length);
     }
     SetQubitCount(qubitCount - length);
+    shards.erase(shards.begin() + start, shards.begin() + start + length);
 
     root->Prune(qubitCount);
 }
 
 real1_f QBdt::Prob(bitLenInt qubit)
 {
+    if (shards[qubit] && !shards[qubit]->IsPhase()) {
+        FlushBuffer(qubit);
+    }
+
     if (stateVec) {
         return stateVec->Prob(qubit);
     }
@@ -319,6 +367,8 @@ real1_f QBdt::Prob(bitLenInt qubit)
 
 real1_f QBdt::ProbAll(bitCapInt perm)
 {
+    FlushBuffers();
+
     if (stateVec) {
         return stateVec->ProbAll(perm);
     }
@@ -343,6 +393,10 @@ real1_f QBdt::ProbAll(bitCapInt perm)
 
 bool QBdt::ForceM(bitLenInt qubit, bool result, bool doForce, bool doApply)
 {
+    if (shards[qubit] && !shards[qubit]->IsPhase()) {
+        FlushBuffer(qubit);
+    }
+
     if (stateVec) {
         return stateVec->ForceM(qubit, result, doForce, doApply);
     }
@@ -419,6 +473,12 @@ bool QBdt::ForceM(bitLenInt qubit, bool result, bool doForce, bool doApply)
 
 bitCapInt QBdt::MAll()
 {
+    for (bitLenInt i = 0; i < qubitCount; i++) {
+        if (shards[i] && !shards[i]->IsPhase()) {
+            FlushBuffer(i);
+        }
+    }
+
     if (stateVec) {
         return stateVec->MAll();
     }
@@ -548,6 +608,8 @@ void QBdt::ApplySingle(const complex* mtrx, bitLenInt target)
 void QBdt::ApplyControlledSingle(
     const complex* mtrx, const bitLenInt* controls, bitLenInt controlLen, bitLenInt target, bool isAnti)
 {
+    FlushControlled(controls, controlLen, target);
+
     if (stateVec) {
         if (isAnti) {
             stateVec->MACMtrx(controls, controlLen, mtrx, target);
@@ -742,7 +804,24 @@ void QBdt::FallbackMCMtrx(
     }
 }
 
-void QBdt::Mtrx(const complex* mtrx, bitLenInt target) { ApplySingle(mtrx, target); }
+void QBdt::Mtrx(const complex* lMtrx, bitLenInt target)
+{
+    complex mtrx[4];
+    if (shards[target]) {
+        shards[target]->Compose(lMtrx);
+        std::copy(shards[target]->gate, shards[target]->gate + 4, mtrx);
+        shards[target] = NULL;
+    } else {
+        std::copy(lMtrx, lMtrx + 4, mtrx);
+    }
+
+    if ((IS_NORM_0(mtrx[1]) && IS_NORM_0(mtrx[2])) || (IS_NORM_0(mtrx[0]) && IS_NORM_0(mtrx[3]))) {
+        ApplySingle(mtrx, target);
+        return;
+    }
+
+    shards[target] = std::make_shared<MpsShard>(mtrx);
+}
 
 void QBdt::MCMtrx(const bitLenInt* controls, bitLenInt controlLen, const complex* mtrx, bitLenInt target)
 {

@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "mpsshard.hpp"
 #include "qbdt_qstabilizer_node.hpp"
 #include "qstabilizer.hpp"
 
@@ -38,6 +39,7 @@ protected:
     int devID;
     QBdtNodeInterfacePtr root;
     QInterfacePtr stateVec;
+    std::vector<MpsShardPtr> shards;
 
     void FallbackMtrx(const complex* mtrx, bitLenInt target);
     void FallbackMCMtrx(
@@ -99,6 +101,25 @@ protected:
         bitCapInt mask = power - ONE_BCI;
         return (perm & mask) | ((perm >> ONE_BCI) & ~mask);
     }
+
+    void FlushBuffer(bitLenInt i);
+
+    void FlushBuffers()
+    {
+        for (bitLenInt i = 0; i < qubitCount; i++) {
+            FlushBuffer(i);
+        }
+        Finish();
+    }
+
+    void DumpBuffers()
+    {
+        for (bitLenInt i = 0U; i < qubitCount; i++) {
+            shards[i] = NULL;
+        }
+    }
+
+    void FlushControlled(const bitLenInt* controls, bitLenInt controlLen, bitLenInt target);
 
     void ApplySingle(const complex* mtrx, bitLenInt target);
 
