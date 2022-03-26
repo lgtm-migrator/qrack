@@ -424,12 +424,26 @@ void QBdtNode::PushStateVector(const complex* mtrx, QBdtNodeInterfacePtr& b0, QB
         return;
     }
 
-    const bool isSame = b0->isEqualUnder(b1);
+    bool isSame = b0->isEqualUnder(b1);
+    if (!isSame && depth) {
+        const bool isSpecial0 = !b0->branches[0];
+        if (isSpecial0) {
+            b0 = b0->PopSpecial();
+        }
+
+        const bool isSpecial1 = !b1->branches[0];
+        if (isSpecial1) {
+            b1 = b1->PopSpecial();
+        }
+
+        if (isSpecial0 || isSpecial1) {
+            isSame = b0->isEqualUnder(b1);
+        }
+    }
     if (isSame) {
-        const complex Y0 = b0->scale;
-        const complex Y1 = b1->scale;
-        b0->scale = mtrx[0] * Y0 + mtrx[1] * Y1;
-        b1->scale = mtrx[2] * Y0 + mtrx[3] * Y1;
+        complex Y0 = b0->scale;
+        b0->scale = mtrx[0] * Y0 + mtrx[1] * b1->scale;
+        b1->scale = mtrx[2] * Y0 + mtrx[3] * b1->scale;
 
         return;
     }
@@ -442,15 +456,6 @@ void QBdtNode::PushStateVector(const complex* mtrx, QBdtNodeInterfacePtr& b0, QB
 
     b0->Branch();
     b1->Branch();
-
-    if (!b0->branches[0]) {
-        b0->PushSpecial(mtrx, b1);
-
-        b0->PopStateVector();
-        b1->PopStateVector();
-
-        return;
-    }
 
     b0->branches[0]->scale *= b0->scale;
     b0->branches[1]->scale *= b0->scale;
