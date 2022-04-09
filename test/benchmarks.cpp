@@ -339,17 +339,17 @@ TEST_CASE("test_cnot_all", "[gates]")
 
 TEST_CASE("test_x_all", "[gates]")
 {
-    benchmarkLoop([](QInterfacePtr qftReg, bitLenInt n) { qftReg->X(0, n); });
+    benchmarkLoop([](QInterfacePtr qftReg, bitLenInt n) { qftReg->XMask(pow2(n) - 1U); });
 }
 
 TEST_CASE("test_y_all", "[gates]")
 {
-    benchmarkLoop([](QInterfacePtr qftReg, bitLenInt n) { qftReg->Y(0, n); });
+    benchmarkLoop([](QInterfacePtr qftReg, bitLenInt n) { qftReg->YMask(pow2(n) - 1U); });
 }
 
 TEST_CASE("test_z_all", "[gates]")
 {
-    benchmarkLoop([](QInterfacePtr qftReg, bitLenInt n) { qftReg->Z(0, n); });
+    benchmarkLoop([](QInterfacePtr qftReg, bitLenInt n) { qftReg->ZMask(pow2(n) - 1U); });
 }
 
 TEST_CASE("test_swap_all", "[gates]")
@@ -615,18 +615,22 @@ TEST_CASE("test_quantum_triviality", "[supreme]")
 
             for (d = 0; d < benchmarkDepth; d++) {
 
+                bitCapInt xMask = 0U;
+                bitCapInt yMask = 0U;
                 for (i = 0; i < n; i++) {
                     gateRand = qReg->Rand();
                     if (gateRand < (ONE_R1 / GateCount1Qb)) {
                         // qReg->H(i);
                     } else if (gateRand < (2 * ONE_R1 / GateCount1Qb)) {
-                        qReg->X(i);
+                        xMask |= pow2(i);
                     } else if (gateRand < (3 * ONE_R1 / GateCount1Qb)) {
-                        qReg->Y(i);
+                        yMask |= pow2(i);
                     } else {
                         qReg->T(i);
                     }
                 }
+                qReg->XMask(xMask);
+                qReg->YMask(yMask);
 
                 std::set<bitLenInt> unusedBits;
                 for (i = 0; i < n; i++) {
@@ -684,18 +688,22 @@ TEST_CASE("test_stabilizer", "[supreme]")
 
             for (d = 0; d < benchmarkDepth; d++) {
 
+                bitCapInt xMask = 0U;
+                bitCapInt yMask = 0U;
                 for (i = 0; i < n; i++) {
                     gateRand = qReg->Rand();
                     if (gateRand < (ONE_R1 / GateCount1Qb)) {
                         qReg->H(i);
                     } else if (gateRand < (2 * ONE_R1 / GateCount1Qb)) {
-                        qReg->X(i);
+                        xMask |= pow2(i);
                     } else if (gateRand < (3 * ONE_R1 / GateCount1Qb)) {
-                        qReg->Y(i);
+                        yMask |= pow2(i);
                     } else {
                         qReg->S(i);
                     }
                 }
+                qReg->XMask(xMask);
+                qReg->YMask(yMask);
 
                 std::set<bitLenInt> unusedBits;
                 for (i = 0; i < n; i++) {
@@ -749,6 +757,7 @@ TEST_CASE("test_stabilizer_t", "[supreme]")
         qReg->SetReactiveSeparate(true);
 
         for (d = 0; d < benchmarkDepth; d++) {
+            bitCapInt zMask = 0U;
             for (i = 0; i < n; i++) {
                 // "Phase" transforms:
                 gateRand = DimCount1Qb * qReg->Rand();
@@ -789,14 +798,14 @@ TEST_CASE("test_stabilizer_t", "[supreme]")
                     qReg->S(i);
                 } else if (gateRand < (3 * ONE_R1)) {
                     // Z^(3/4)
-                    qReg->Z(i);
+                    zMask |= pow2(i);
                     qReg->IT(i);
                 } else if (gateRand < (4 * ONE_R1)) {
                     // Z
-                    qReg->Z(i);
+                    zMask |= pow2(i);
                 } else if (gateRand < (5 * ONE_R1)) {
                     // Z^(-3/4)
-                    qReg->Z(i);
+                    zMask |= pow2(i);
                     qReg->T(i);
                 } else if (gateRand < (6 * ONE_R1)) {
                     // Z^(-1/2)
@@ -807,6 +816,7 @@ TEST_CASE("test_stabilizer_t", "[supreme]")
                 }
                 // else - identity
             }
+            qReg->ZMask(zMask);
 
             std::set<bitLenInt> unusedBits;
             for (i = 0; i < n; i++) {
@@ -887,6 +897,7 @@ TEST_CASE("test_stabilizer_t_cc", "[supreme]")
         qReg->SetReactiveSeparate(true);
 
         for (d = 0; d < benchmarkDepth; d++) {
+            bitCapInt zMask = 0U;
             for (i = 0; i < n; i++) {
                 // "Phase" transforms:
                 gateRand = DimCount1Qb * qReg->Rand();
@@ -927,14 +938,14 @@ TEST_CASE("test_stabilizer_t_cc", "[supreme]")
                     qReg->S(i);
                 } else if (gateRand < (3 * ONE_R1)) {
                     // Z^(3/4)
-                    qReg->Z(i);
+                    zMask |= pow2(i);
                     qReg->IT(i);
                 } else if (gateRand < (4 * ONE_R1)) {
                     // Z
-                    qReg->Z(i);
+                    zMask |= pow2(i);
                 } else if (gateRand < (5 * ONE_R1)) {
                     // Z^(-3/4)
-                    qReg->Z(i);
+                    zMask |= pow2(i);
                     qReg->T(i);
                 } else if (gateRand < (6 * ONE_R1)) {
                     // Z^(-1/2)
@@ -945,6 +956,7 @@ TEST_CASE("test_stabilizer_t_cc", "[supreme]")
                 }
                 // else - identity
             }
+            qReg->ZMask(zMask);
 
             std::set<bitLenInt> unusedBits;
             for (i = 0; i < n; i++) {
@@ -1092,8 +1104,8 @@ TEST_CASE("test_stabilizer_t_nn", "[supreme]")
                 //"Position" transforms:
 
                 // Continuous Z root gates option:
-                gateRand = 2 * PI_R1 * qReg->Rand();
-                qReg->Phase(ONE_R1, std::polar(ONE_R1, (real1)gateRand), i);
+                gateRand = (real1_f)(2 * PI_R1 * qReg->Rand());
+                qReg->Phase(ONE_CMPLX, std::polar(ONE_R1, (real1)gateRand), i);
 
                 // Discrete Z root gates option:
                 /*
@@ -1232,7 +1244,7 @@ TEST_CASE("test_stabilizer_t_nn_d", "[supreme]")
     if (benchmarkMaxMagic >= 0) {
         std::cout << "(max quantum \"magic\": " << benchmarkMaxMagic << ")";
     } else {
-        std::cout << "(max quantum \"magic\": default, no ceiling)";
+        std::cout << "(max quantum \"magic\": default, ceiling equal to qubit count +2)";
     }
 
     const int DimCount1Qb = 4;
@@ -1260,6 +1272,7 @@ TEST_CASE("test_stabilizer_t_nn_d", "[supreme]")
         auto iterClock = std::chrono::high_resolution_clock::now();
 
         for (int d = 0; d < benchmarkDepth; d++) {
+            bitCapInt zMask = 0U;
             for (bitLenInt i = 0; i < n; i++) {
                 // "Phase" transforms:
                 gateRand = DimCount1Qb * qReg->Rand();
@@ -1291,7 +1304,7 @@ TEST_CASE("test_stabilizer_t_nn_d", "[supreme]")
                 // Discrete Z root gates option:
                 gateRand = 2 * qReg->Rand();
                 if (gateRand < ONE_R1) {
-                    qReg->Z(i);
+                    zMask |= pow2(i);
                 }
 
                 gateRand = 2 * qReg->Rand();
@@ -1323,6 +1336,7 @@ TEST_CASE("test_stabilizer_t_nn_d", "[supreme]")
                     }
                 }
             }
+            qReg->ZMask(zMask);
 
             gate = gateSequence.front();
             gateSequence.pop_front();
@@ -1441,7 +1455,10 @@ TEST_CASE("test_dense", "[supreme]")
 
         for (int d = 0; d < benchmarkDepth; d++) {
             for (bitLenInt i = 0; i < n; i++) {
-                qReg->U(i, 4 * PI_R1 * qReg->Rand(), 4 * PI_R1 * qReg->Rand(), 4 * PI_R1 * qReg->Rand());
+                const real1_f theta = 4 * (real1_f)PI_R1 * qReg->Rand();
+                const real1_f phi = 4 * (real1_f)PI_R1 * qReg->Rand();
+                const real1_f lambda = 4 * (real1_f)PI_R1 * qReg->Rand();
+                qReg->U(i, (real1_f)theta, (real1_f)phi, (real1_f)lambda);
             }
 
             gate = gateSequence.front();
@@ -1595,8 +1612,8 @@ TEST_CASE("test_stabilizer_t_cc_nn", "[supreme]")
                 // "Position transforms:
 
                 // Continuous Z root gates option:
-                gateRand = 2 * PI_R1 * qReg->Rand();
-                qReg->Phase(ONE_R1, std::polar(ONE_R1, (real1)gateRand), i);
+                gateRand = (real1_f)(2 * PI_R1 * qReg->Rand());
+                qReg->Phase(ONE_CMPLX, std::polar(ONE_R1, (real1)gateRand), i);
 
                 // Discrete Z root gates option:
                 /*
@@ -1846,8 +1863,8 @@ TEST_CASE("test_stabilizer_ct_nn", "[supreme]")
                 // "Position transforms:
 
                 // Continuous Z root gates option:
-                gateRand = 2 * PI_R1 * qReg->Rand();
-                qReg->Phase(ONE_R1, std::polar(ONE_R1, (real1)gateRand), i);
+                gateRand = (real1_f)(2 * PI_R1 * qReg->Rand());
+                qReg->Phase(ONE_CMPLX, std::polar(ONE_R1, (real1)gateRand), i);
 
                 // Discrete Z root gates option:
                 /*
@@ -2026,9 +2043,9 @@ TEST_CASE("test_universal_circuit_continuous", "[supreme]")
             for (d = 0; d < benchmarkDepth; d++) {
 
                 for (i = 0; i < n; i++) {
-                    theta = 2 * PI_R1 * qReg->Rand();
-                    phi = 2 * PI_R1 * qReg->Rand();
-                    lambda = 2 * PI_R1 * qReg->Rand();
+                    theta = (real1_f)(2 * PI_R1 * qReg->Rand());
+                    phi = (real1_f)(2 * PI_R1 * qReg->Rand());
+                    lambda = (real1_f)(2 * PI_R1 * qReg->Rand());
 
                     qReg->U(i, theta, phi, lambda);
                 }
@@ -2132,18 +2149,22 @@ TEST_CASE("test_universal_circuit_digital", "[supreme]")
 
             for (d = 0; d < benchmarkDepth; d++) {
 
+                bitCapInt xMask = 0U;
+                bitCapInt yMask = 0U;
                 for (i = 0; i < n; i++) {
                     gateRand = qReg->Rand();
                     if (gateRand < (ONE_R1 / GateCount1Qb)) {
                         qReg->H(i);
                     } else if (gateRand < (2 * ONE_R1 / GateCount1Qb)) {
-                        qReg->X(i);
+                        xMask |= pow2(i);
                     } else if (gateRand < (3 * ONE_R1 / GateCount1Qb)) {
-                        qReg->Y(i);
+                        yMask |= pow2(i);
                     } else {
                         qReg->T(i);
                     }
                 }
+                qReg->XMask(xMask);
+                qReg->YMask(yMask);
 
                 std::set<bitLenInt> unusedBits;
                 for (i = 0; i < n; i++) {
@@ -2275,18 +2296,22 @@ TEST_CASE("test_ccz_ccx_h", "[supreme]")
 
             for (d = 0; d < benchmarkDepth; d++) {
 
+                bitCapInt zMask = 0U;
+                bitCapInt xMask = 0U;
                 for (i = 0; i < n; i++) {
                     gateRand = GateCount1Qb * qReg->Rand();
                     if (gateRand < 1) {
                         qReg->H(i);
                     } else if (gateRand < 2) {
-                        qReg->Z(i);
+                        zMask |= pow2(i);
                     } else if (gateRand < 3) {
-                        qReg->X(i);
+                        xMask |= pow2(i);
                     } else {
                         // Identity;
                     }
                 }
+                qReg->ZMask(zMask);
+                qReg->XMask(xMask);
 
                 std::set<bitLenInt> unusedBits;
                 for (i = 0; i < n; i++) {
@@ -2708,18 +2733,22 @@ TEST_CASE("test_universal_circuit_digital_cross_entropy", "[supreme]")
 
     for (d = 0; d < Depth; d++) {
         std::vector<int>& layer1QbRands = gate1QbRands[d];
+        bitCapInt xMask = 0U;
+        bitCapInt yMask = 0U;
         for (i = 0; i < layer1QbRands.size(); i++) {
             int gate1Qb = layer1QbRands[i];
             if (gate1Qb == 0) {
                 goldStandard->H(i);
             } else if (gate1Qb == 1) {
-                goldStandard->X(i);
+                xMask |= pow2(i);
             } else if (gate1Qb == 2) {
-                goldStandard->Y(i);
+                yMask |= pow2(i);
             } else {
                 goldStandard->T(i);
             }
         }
+        goldStandard->XMask(xMask);
+        goldStandard->YMask(yMask);
 
         std::vector<MultiQubitGate>& layerMultiQbRands = gateMultiQbRands[d];
         for (i = 0; i < layerMultiQbRands.size(); i++) {
@@ -2747,7 +2776,7 @@ TEST_CASE("test_universal_circuit_digital_cross_entropy", "[supreme]")
 
     real1_f uniformRandomCount = ITERATIONS / (real1_f)permCount;
     int goldBinResult;
-    real1_f crossEntropy = ZERO_R1;
+    real1_f crossEntropy = ZERO_R1_F;
     for (perm = 0; perm < permCount; perm++) {
         measurementBin = goldStandardResult.find(perm);
         if (measurementBin == goldStandardResult.end()) {
@@ -2757,16 +2786,16 @@ TEST_CASE("test_universal_circuit_digital_cross_entropy", "[supreme]")
         }
         crossEntropy += (uniformRandomCount - goldBinResult) * (uniformRandomCount - goldBinResult);
     }
-    if (crossEntropy < ZERO_R1) {
-        crossEntropy = ZERO_R1;
+    if (crossEntropy < ZERO_R1_F) {
+        crossEntropy = ZERO_R1_F;
     }
-    crossEntropy = ONE_R1 - sqrt(crossEntropy) / ITERATIONS;
+    crossEntropy = ONE_R1_F - sqrt(crossEntropy) / ITERATIONS;
     std::cout << "Gold standard vs. uniform random cross entropy (out of 1.0): " << crossEntropy << std::endl;
 
     std::map<bitCapInt, int> goldStandardResult2 = goldStandard->MultiShotMeasureMask(qPowers, n, ITERATIONS);
 
     int testBinResult;
-    crossEntropy = ZERO_R1;
+    crossEntropy = ZERO_R1_F;
     for (perm = 0; perm < permCount; perm++) {
         measurementBin = goldStandardResult.find(perm);
         if (measurementBin == goldStandardResult.end()) {
@@ -2783,10 +2812,10 @@ TEST_CASE("test_universal_circuit_digital_cross_entropy", "[supreme]")
         }
         crossEntropy += (testBinResult - goldBinResult) * (testBinResult - goldBinResult);
     }
-    if (crossEntropy < ZERO_R1) {
-        crossEntropy = ZERO_R1;
+    if (crossEntropy < ZERO_R1_F) {
+        crossEntropy = ZERO_R1_F;
     }
-    crossEntropy = ONE_R1 - sqrt(crossEntropy) / ITERATIONS;
+    crossEntropy = ONE_R1_F - sqrt(crossEntropy) / ITERATIONS;
     std::cout << "Gold standard vs. gold standard cross entropy (out of 1.0): " << crossEntropy << std::endl;
 
     QInterfacePtr testCase = CreateQuantumInterface({ testEngineType, testSubEngineType }, n, 0, rng, ONE_CMPLX,
@@ -2798,18 +2827,22 @@ TEST_CASE("test_universal_circuit_digital_cross_entropy", "[supreme]")
         testCase->SetPermutation(0);
         for (d = 0; d < Depth; d++) {
             std::vector<int>& layer1QbRands = gate1QbRands[d];
+            bitCapInt xMask = 0U;
+            bitCapInt yMask = 0U;
             for (i = 0; i < layer1QbRands.size(); i++) {
                 int gate1Qb = layer1QbRands[i];
                 if (gate1Qb == 0) {
                     testCase->H(i);
                 } else if (gate1Qb == 1) {
-                    testCase->X(i);
+                    xMask |= pow2(i);
                 } else if (gate1Qb == 2) {
-                    testCase->Y(i);
+                    yMask |= pow2(i);
                 } else {
                     testCase->T(i);
                 }
             }
+            testCase->XMask(xMask);
+            testCase->YMask(yMask);
 
             std::vector<MultiQubitGate>& layerMultiQbRands = gateMultiQbRands[d];
             for (i = 0; i < layerMultiQbRands.size(); i++) {
@@ -2837,7 +2870,7 @@ TEST_CASE("test_universal_circuit_digital_cross_entropy", "[supreme]")
     // faster benchmark. This will not test the effect of the MReg() method.
     // testCaseResult = testCase->MultiShotMeasureMask(qPowers, n, ITERATIONS);
 
-    crossEntropy = ZERO_R1;
+    crossEntropy = ZERO_R1_F;
     for (perm = 0; perm < permCount; perm++) {
         measurementBin = goldStandardResult.find(perm);
         if (measurementBin == goldStandardResult.end()) {
@@ -2854,10 +2887,10 @@ TEST_CASE("test_universal_circuit_digital_cross_entropy", "[supreme]")
         }
         crossEntropy += (testBinResult - goldBinResult) * (testBinResult - goldBinResult);
     }
-    if (crossEntropy < ZERO_R1) {
-        crossEntropy = ZERO_R1;
+    if (crossEntropy < ZERO_R1_F) {
+        crossEntropy = ZERO_R1_F;
     }
-    crossEntropy = ONE_R1 - sqrt(crossEntropy) / ITERATIONS;
+    crossEntropy = ONE_R1_F - sqrt(crossEntropy) / ITERATIONS;
     std::cout << "Gold standard vs. test case cross entropy (out of 1.0): " << crossEntropy << std::endl;
 
     std::map<bitCapInt, int> testCaseResult2;
@@ -2866,18 +2899,22 @@ TEST_CASE("test_universal_circuit_digital_cross_entropy", "[supreme]")
 
     for (d = 0; d < Depth; d++) {
         std::vector<int>& layer1QbRands = gate1QbRands[d];
+        bitCapInt xMask = 0U;
+        bitCapInt yMask = 0U;
         for (i = 0; i < layer1QbRands.size(); i++) {
             int gate1Qb = layer1QbRands[i];
             if (gate1Qb == 0) {
                 testCase->H(i);
             } else if (gate1Qb == 1) {
-                testCase->X(i);
+                xMask |= pow2(i);
             } else if (gate1Qb == 2) {
-                testCase->Y(i);
+                yMask |= pow2(i);
             } else {
                 testCase->T(i);
             }
         }
+        testCase->XMask(xMask);
+        testCase->YMask(yMask);
 
         std::vector<MultiQubitGate>& layerMultiQbRands = gateMultiQbRands[d];
         for (i = 0; i < layerMultiQbRands.size(); i++) {
@@ -2895,7 +2932,7 @@ TEST_CASE("test_universal_circuit_digital_cross_entropy", "[supreme]")
     }
     testCaseResult2 = testCase->MultiShotMeasureMask(qPowers, n, ITERATIONS);
 
-    crossEntropy = ZERO_R1;
+    crossEntropy = ZERO_R1_F;
     for (perm = 0; perm < permCount; perm++) {
         measurementBin = testCaseResult.find(perm);
         if (measurementBin == testCaseResult.end()) {
@@ -2912,9 +2949,9 @@ TEST_CASE("test_universal_circuit_digital_cross_entropy", "[supreme]")
         }
         crossEntropy += (testBinResult - goldBinResult) * (testBinResult - goldBinResult);
     }
-    if (crossEntropy < ZERO_R1) {
-        crossEntropy = ZERO_R1;
+    if (crossEntropy < ZERO_R1_F) {
+        crossEntropy = ZERO_R1_F;
     }
-    crossEntropy = ONE_R1 - sqrt(crossEntropy) / ITERATIONS;
+    crossEntropy = ONE_R1_F - sqrt(crossEntropy) / ITERATIONS;
     std::cout << "Test case vs. (duplicate) test case cross entropy (out of 1.0): " << crossEntropy << std::endl;
 }

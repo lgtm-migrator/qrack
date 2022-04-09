@@ -17,7 +17,6 @@ include_directories ("include" "include/common")
 add_library (qrack STATIC
     src/common/functions.cpp
     src/common/parallel_for.cpp
-    src/common/rdrandwrapper.cpp
     src/qinterface/gates.cpp
     src/qinterface/logic.cpp
     src/qinterface/qinterface.cpp
@@ -26,6 +25,7 @@ add_library (qrack STATIC
     src/qengine/arithmetic.cpp
     src/qengine/state.cpp
     src/qengine/utility.cpp
+    src/qengineshard.cpp
     src/qunit.cpp
     src/qpager.cpp
     src/qstabilizer.cpp
@@ -58,6 +58,10 @@ if (ENABLE_PTHREAD)
 	    set(QRACK_LIBS ${QRACK_LIBS} pthread)
 	endif (NOT ANDROID AND NOT MSVC)
 endif (ENABLE_PTHREAD)
+
+if (FPPOW GREATER 6)
+    set(QRACK_LIBS ${QRACK_LIBS} quadmath)
+endif (FPPOW GREATER 6)
 
 target_link_libraries (qrack_pinvoke ${QRACK_LIBS})
 if (NOT ENABLE_EMIT_LLVM)

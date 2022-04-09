@@ -19,8 +19,6 @@
 #include "qalu.hpp"
 #endif
 
-#include <algorithm>
-
 namespace Qrack {
 
 class QEngine;
@@ -40,10 +38,6 @@ protected:
     /// summed, at each update. To normalize, we should always multiply by 1/sqrt(runningNorm).
     bitCapIntOcl maxQPowerOcl;
     real1 runningNorm;
-
-    bool IsPhase(const complex* mtrx) { return IS_NORM_0(mtrx[1]) && IS_NORM_0(mtrx[2]); }
-
-    bool IsInvert(const complex* mtrx) { return IS_NORM_0(mtrx[0]) && IS_NORM_0(mtrx[3]); }
 
     bool IsIdentity(const complex* mtrx, bool isControlled);
 
@@ -80,7 +74,7 @@ public:
     virtual real1_f GetRunningNorm()
     {
         Finish();
-        return runningNorm;
+        return (real1_f)runningNorm;
     }
 
     /** Set all amplitudes to 0, and optionally temporarily deallocate state vector RAM */
@@ -110,7 +104,7 @@ public:
      * for the next normalization operation. */
     virtual void QueueSetRunningNorm(real1_f runningNrm) = 0;
 
-    virtual void ZMask(bitCapInt mask) { PhaseParity(PI_R1, mask); }
+    virtual void ZMask(bitCapInt mask) { PhaseParity((real1_f)PI_R1, mask); }
 
     virtual bool ForceM(bitLenInt qubitIndex, bool result, bool doForce = true, bool doApply = true);
     virtual bitCapInt ForceM(const bitLenInt* bits, bitLenInt length, const bool* values, bool doApply = true);

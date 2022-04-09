@@ -25,7 +25,7 @@ QInterface::QInterface(
     bitLenInt n, qrack_rand_gen_ptr rgp, bool doNorm, bool useHardwareRNG, bool randomGlobalPhase, real1_f norm_thresh)
     : qubitCount(n)
     , maxQPower(pow2(qubitCount))
-    , rand_distribution(0.0, 1.0)
+    , rand_distribution(ZERO_R1_F, ONE_R1_F)
     , hardware_rand_generator(NULL)
     , doNormalize(doNorm)
     , randGlobalPhase(randomGlobalPhase)
@@ -250,16 +250,17 @@ bitCapInt QInterface::ForceM(const bitLenInt* bits, bitLenInt length, const bool
 /// Returns probability of permutation of the register
 real1_f QInterface::ProbReg(bitLenInt start, bitLenInt length, bitCapInt permutation)
 {
-    real1 prob = ONE_R1;
-    for (bitLenInt i = 0; i < length; i++) {
-        if ((permutation >> i) & ONE_BCI) {
-            prob *= Prob(start + i);
-        } else {
-            prob *= (ONE_R1 - Prob(start + i));
-        }
+    const bitCapIntOcl startMask = pow2Ocl(start) - ONE_BCI;
+    const bitCapIntOcl maxLcv = maxQPower >> length;
+    const bitCapIntOcl p = (bitCapIntOcl)permutation;
+    real1 prob = ZERO_R1;
+    for (bitCapIntOcl lcv = 0; lcv < maxLcv; lcv++) {
+        bitCapIntOcl i = lcv & startMask;
+        i |= ((lcv ^ i) | p) << length;
+        prob += ProbAll(i);
     }
 
-    return prob;
+    return (real1_f)prob;
 }
 
 /// Returns probability of permutation of the mask
@@ -272,7 +273,7 @@ real1_f QInterface::ProbMask(bitCapInt mask, bitCapInt permutation)
         }
     }
 
-    return prob;
+    return (real1_f)prob;
 }
 
 /// "Circular shift right" - (Uses swap-based algorithm for speed)

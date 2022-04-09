@@ -16,7 +16,6 @@
 #include "common/rdrandwrapper.hpp"
 #include "hamiltonian.hpp"
 
-#include <ctime>
 #include <map>
 #include <vector>
 
@@ -112,8 +111,6 @@ enum QInterfaceEngine {
 #if ENABLE_OPENCL
     QINTERFACE_OPTIMAL_SCHROEDINGER = QINTERFACE_QPAGER,
 
-    QINTERFACE_OPTIMAL_SINGLE_PAGE = QINTERFACE_MASK_FUSION,
-
 #if FPPOW > 4
     QINTERFACE_OPTIMAL_BASE = QINTERFACE_HYBRID,
 #else
@@ -122,8 +119,6 @@ enum QInterfaceEngine {
 
 #else
     QINTERFACE_OPTIMAL_SCHROEDINGER = QINTERFACE_CPU,
-
-    QINTERFACE_OPTIMAL_SINGLE_PAGE = QINTERFACE_MASK_FUSION,
 
     QINTERFACE_OPTIMAL_BASE = QINTERFACE_CPU,
 #endif
@@ -163,20 +158,18 @@ protected:
 
     // Compilers have difficulty figuring out types and overloading if the "norm" handle is passed to std::transform. If
     // you need a safe pointer to norm(), try this:
-    static inline real1_f normHelper(complex c) { return norm(c); }
+    static inline real1_f normHelper(complex c) { return (real1_f)norm(c); }
 
     static inline real1_f clampProb(real1_f toClamp)
     {
-        if (toClamp < ZERO_R1) {
-            toClamp = ZERO_R1;
+        if (toClamp < ZERO_R1_F) {
+            toClamp = ZERO_R1_F;
         }
-        if (toClamp > ONE_R1) {
-            toClamp = ONE_R1;
+        if (toClamp > ONE_R1_F) {
+            toClamp = ONE_R1_F;
         }
         return toClamp;
     }
-
-    template <typename GateFunc> void ControlledLoopFixture(bitLenInt length, GateFunc gate);
 
     void FreeAligned(void* toFree)
     {
@@ -193,7 +186,7 @@ protected:
     complex GetNonunitaryPhase()
     {
         if (randGlobalPhase) {
-            real1_f angle = Rand() * 2 * PI_R1;
+            real1_f angle = Rand() * 2 * (real1_f)PI_R1;
             return complex((real1)cos(angle), (real1)sin(angle));
         } else {
             return ONE_CMPLX;
@@ -202,15 +195,14 @@ protected:
 
     template <typename Fn> void MACWrapper(const bitLenInt* controls, bitLenInt controlLen, Fn fn)
     {
+        bitCapInt xMask = 0U;
         for (bitLenInt i = 0; i < controlLen; i++) {
-            X(controls[i]);
+            xMask |= pow2(controls[i]);
         }
 
+        XMask(xMask);
         fn(controls, controlLen);
-
-        for (bitLenInt i = 0; i < controlLen; i++) {
-            X(controls[i]);
-        }
+        XMask(xMask);
     }
 
 public:
@@ -444,43 +436,92 @@ public:
     /**
      * Apply an arbitrary single bit unitary transformation, with arbitrary (anti-)control bits.
      */
-    virtual void MACMtrx(const bitLenInt* controls, bitLenInt controlLen, const complex* mtrx, bitLenInt target);
+    virtual void MACMtrx(const bitLenInt* controls, bitLenInt controlLen, const complex* mtrx, bitLenInt target)
+    {
+        if (IS_NORM_0(mtrx[1]) && IS_NORM_0(mtrx[2])) {
+            MACPhase(controls, controlLen, mtrx[0], mtrx[3], target);
+        } else if (IS_NORM_0(mtrx[0]) && IS_NORM_0(mtrx[3])) {
+            MACInvert(controls, controlLen, mtrx[1], mtrx[2], target);
+        } else {
+            MACWrapper(controls, controlLen,
+                [this, mtrx, target](const bitLenInt* lc, bitLenInt lcLen) { MCMtrx(lc, lcLen, mtrx, target); });
+        }
+    }
 
     /**
      * Apply a single bit transformation that only effects phase.
      */
-    virtual void Phase(const complex topLeft, const complex bottomRight, bitLenInt qubitIndex);
+    virtual void Phase(const complex topLeft, const complex bottomRight, bitLenInt qubitIndex)
+    {
+        if ((randGlobalPhase || IS_NORM_0(ONE_CMPLX - topLeft)) && IS_NORM_0(topLeft - bottomRight)) {
+            return;
+        }
+
+        const complex mtrx[4] = { topLeft, ZERO_CMPLX, ZERO_CMPLX, bottomRight };
+        Mtrx(mtrx, qubitIndex);
+    }
 
     /**
      * Apply a single bit transformation that reverses bit probability and might effect phase.
      */
-    virtual void Invert(const complex topRight, const complex bottomLeft, bitLenInt qubitIndex);
+    virtual void Invert(const complex topRight, const complex bottomLeft, bitLenInt qubitIndex)
+    {
+        const complex mtrx[4] = { ZERO_CMPLX, topRight, bottomLeft, ZERO_CMPLX };
+        Mtrx(mtrx, qubitIndex);
+    }
 
     /**
      * Apply a single bit transformation that only effects phase, with arbitrary control bits.
      */
     virtual void MCPhase(
-        const bitLenInt* controls, bitLenInt controlLen, complex topLeft, complex bottomRight, bitLenInt target);
+        const bitLenInt* controls, bitLenInt controlLen, complex topLeft, complex bottomRight, bitLenInt target)
+    {
+        if (IS_NORM_0(ONE_CMPLX - topLeft) && IS_NORM_0(ONE_CMPLX - bottomRight)) {
+            return;
+        }
+
+        const complex mtrx[4] = { topLeft, ZERO_CMPLX, ZERO_CMPLX, bottomRight };
+        MCMtrx(controls, controlLen, mtrx, target);
+    }
 
     /**
      * Apply a single bit transformation that reverses bit probability and might effect phase, with arbitrary control
      * bits.
      */
     virtual void MCInvert(
-        const bitLenInt* controls, bitLenInt controlLen, complex topRight, complex bottomLeft, bitLenInt target);
+        const bitLenInt* controls, bitLenInt controlLen, complex topRight, complex bottomLeft, bitLenInt target)
+    {
+        const complex mtrx[4] = { ZERO_CMPLX, topRight, bottomLeft, ZERO_CMPLX };
+        MCMtrx(controls, controlLen, mtrx, target);
+    }
 
     /**
      * Apply a single bit transformation that only effects phase, with arbitrary (anti-)control bits.
      */
     virtual void MACPhase(
-        const bitLenInt* controls, bitLenInt controlLen, complex topLeft, complex bottomRight, bitLenInt target);
+        const bitLenInt* controls, bitLenInt controlLen, complex topLeft, complex bottomRight, bitLenInt target)
+    {
+        if (IS_NORM_0(ONE_CMPLX - topLeft) && IS_NORM_0(ONE_CMPLX - bottomRight)) {
+            return;
+        }
+
+        MACWrapper(controls, controlLen, [this, topLeft, bottomRight, target](const bitLenInt* lc, bitLenInt lcLen) {
+            MCPhase(lc, lcLen, topLeft, bottomRight, target);
+        });
+    }
 
     /**
      * Apply a single bit transformation that reverses bit probability and might effect phase, with arbitrary
      * (anti-)control bits.
      */
     virtual void MACInvert(
-        const bitLenInt* controls, bitLenInt controlLen, complex topRight, complex bottomLeft, bitLenInt target);
+        const bitLenInt* controls, bitLenInt controlLen, complex topRight, complex bottomLeft, bitLenInt target)
+    {
+        MACWrapper(controls, controlLen, [this, topRight, bottomLeft, target](const bitLenInt* lc, bitLenInt lcLen) {
+            MCInvert(lc, lcLen, topRight, bottomLeft, target);
+        });
+    }
+
     /**
      * Apply a "uniformly controlled" arbitrary single bit unitary transformation. (See
      * https://arxiv.org/abs/quant-ph/0312218)
@@ -660,7 +701,7 @@ public:
      */
     virtual void IU2(bitLenInt target, real1_f phi, real1_f lambda)
     {
-        U(target, M_PI / 2, -lambda - PI_R1, -phi + PI_R1);
+        U(target, (real1_f)(M_PI / 2), (real1_f)(-lambda - PI_R1), (real1_f)(-phi + PI_R1));
     }
 
     /**
@@ -1982,7 +2023,7 @@ public:
      *
      * \warning PSEUDO-QUANTUM
      */
-    virtual real1_f ProbAll(bitCapInt fullRegister) { return clampProb(norm(GetAmplitude(fullRegister))); }
+    virtual real1_f ProbAll(bitCapInt fullRegister) { return clampProb((real1_f)norm(GetAmplitude(fullRegister))); }
 
     /**
      * Direct measure of register permutation probability
@@ -2099,7 +2140,7 @@ public:
      * \warning PSEUDO-QUANTUM
      */
     virtual void NormalizeState(
-        real1_f nrm = REAL1_DEFAULT_ARG, real1_f norm_thresh = REAL1_DEFAULT_ARG, real1_f phaseArg = ZERO_R1) = 0;
+        real1_f nrm = REAL1_DEFAULT_ARG, real1_f norm_thresh = REAL1_DEFAULT_ARG, real1_f phaseArg = ZERO_R1_F) = 0;
 
     /**
      * If asynchronous work is still running, block until it finishes. Note that this is never necessary to get correct,

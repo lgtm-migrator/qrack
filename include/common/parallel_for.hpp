@@ -15,7 +15,6 @@
 /* Needed for bitCapInt typedefs. */
 #include "qrack_types.hpp"
 
-#include <algorithm>
 #include <set>
 #include <vector>
 
@@ -76,7 +75,7 @@ public:
     void par_for_qbdt(const bitCapInt begin, const bitCapInt end, BdtFunc fn);
 
     /** Calculate the normal for the array, (with flooring). */
-    real1_f par_norm(const bitCapIntOcl maxQPower, const StateVectorPtr stateArray, real1_f norm_thresh = ZERO_R1);
+    real1_f par_norm(const bitCapIntOcl maxQPower, const StateVectorPtr stateArray, real1_f norm_thresh = ZERO_R1_F);
 
     /** Calculate the normal for the array, (without flooring.) */
     real1_f par_norm_exact(const bitCapIntOcl maxQPower, const StateVectorPtr stateArray);

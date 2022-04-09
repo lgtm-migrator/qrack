@@ -405,12 +405,12 @@ MICROSOFT_QUANTUM_DECL unsigned init_count_type(_In_ unsigned q, _In_ bool md, _
     }
 #endif
 
-    if (zxf && (!pg || simulatorType.size())) {
-        simulatorType.push_back(QINTERFACE_MASK_FUSION);
+    if (pg && !sh && simulatorType.size()) {
+        simulatorType.push_back(QINTERFACE_QPAGER);
     }
 
-    if (pg && (bdt || !sh || simulatorType.size())) {
-        simulatorType.push_back(QINTERFACE_QPAGER);
+    if (zxf) {
+        simulatorType.push_back(QINTERFACE_MASK_FUSION);
     }
 
     if (bdt) {
@@ -574,7 +574,7 @@ MICROSOFT_QUANTUM_DECL unsigned init_count_pager(_In_ unsigned q, _In_ bool hp)
     if (q) {
         try {
             simulator = CreateQuantumInterface(simulatorType, q, 0, randNumGen, CMPLX_DEFAULT_ARG, false, true, hp, -1,
-                true, false, REAL1_EPSILON, deviceList, 0, FP_NORM_EPSILON);
+                true, false, REAL1_EPSILON, deviceList, 0, FP_NORM_EPSILON_F);
         } catch (...) {
             isSuccess = false;
         }
@@ -727,7 +727,7 @@ MICROSOFT_QUANTUM_DECL void Dump(_In_ unsigned sid, _In_ ProbAmpCallback callbac
         simulatorErrors[sid] = 1;
     }
     for (size_t i = 0; i < wfnl; i++) {
-        if (!callback(i, real(wfn[i]), imag(wfn[i]))) {
+        if (!callback(i, (real1_f)real(wfn[i]), (real1_f)imag(wfn[i]))) {
             break;
         }
     }
@@ -1347,6 +1347,53 @@ MICROSOFT_QUANTUM_DECL void Multiplex1Mtrx(
     MAP_CONTROLS_AND_LOCK(sid, n)
     try {
         simulator->UniformlyControlledSingleBit(ctrlsArray.get(), n, shards[simulator.get()][q], mtrxs.get());
+    } catch (...) {
+        simulatorErrors[sid] = 1;
+    }
+}
+
+#define MAP_MASK_AND_LOCK(sid, numQ)                                                                                   \
+    SIMULATOR_LOCK_GUARD(sid)                                                                                          \
+    QInterfacePtr simulator = simulators[sid];                                                                         \
+    bitCapInt mask = 0U;                                                                                               \
+    for (unsigned i = 0; i < numQ; i++) {                                                                              \
+        mask |= pow2(shards[simulator.get()][q[i]]);                                                                   \
+    }
+
+/**
+ * (External API) Multiple "X" Gate
+ */
+MICROSOFT_QUANTUM_DECL void MX(_In_ unsigned sid, _In_ unsigned n, _In_reads_(n) unsigned* q)
+{
+    MAP_MASK_AND_LOCK(sid, n)
+    try {
+        simulator->XMask(mask);
+    } catch (...) {
+        simulatorErrors[sid] = 1;
+    }
+}
+
+/**
+ * (External API) Multiple "Y" Gate
+ */
+MICROSOFT_QUANTUM_DECL void MY(_In_ unsigned sid, _In_ unsigned n, _In_reads_(n) unsigned* q)
+{
+    MAP_MASK_AND_LOCK(sid, n)
+    try {
+        simulator->YMask(mask);
+    } catch (...) {
+        simulatorErrors[sid] = 1;
+    }
+}
+
+/**
+ * (External API) Multiple "Z" Gate
+ */
+MICROSOFT_QUANTUM_DECL void MZ(_In_ unsigned sid, _In_ unsigned n, _In_reads_(n) unsigned* q)
+{
+    MAP_MASK_AND_LOCK(sid, n)
+    try {
+        simulator->ZMask(mask);
     } catch (...) {
         simulatorErrors[sid] = 1;
     }
@@ -2244,7 +2291,7 @@ MICROSOFT_QUANTUM_DECL void TimeEvolve(_In_ unsigned sid, _In_ double t, _In_ un
 
     try {
         QInterfacePtr simulator = simulators[sid];
-        simulator->TimeEvolve(h, (real1)t);
+        simulator->TimeEvolve(h, (real1_f)t);
     } catch (...) {
         simulatorErrors[sid] = 1;
     }

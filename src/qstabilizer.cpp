@@ -58,6 +58,23 @@ QStabilizer::QStabilizer(bitLenInt n, bitCapInt perm, qrack_rand_gen_ptr rgp, co
     SetPermutation(perm);
 }
 
+bool QStabilizer::TrimControls(
+    const bitLenInt* lControls, bitLenInt lControlLen, bool isAnti, std::vector<bitLenInt>& output)
+{
+    for (bitLenInt i = 0; i < lControlLen; i++) {
+        const bitLenInt bit = lControls[i];
+        if (!IsSeparableZ(bit)) {
+            output.push_back(bit);
+            continue;
+        }
+        if (isAnti == M(bit)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 void QStabilizer::SetPermutation(bitCapInt perm, complex phaseFac)
 {
     Dump();
@@ -97,49 +114,6 @@ void QStabilizer::SetPermutation(bitCapInt perm, complex phaseFac)
     }
 }
 
-/// Sets row i equal to row k
-void QStabilizer::rowcopy(const bitLenInt& i, const bitLenInt& k)
-{
-    if (i == k) {
-        return;
-    }
-
-    x[i] = x[k];
-    z[i] = z[k];
-    r[i] = r[k];
-}
-
-/// Swaps row i and row k - does not change the logical state
-void QStabilizer::rowswap(const bitLenInt& i, const bitLenInt& k)
-{
-    if (i == k) {
-        return;
-    }
-
-    std::swap(x[k], x[i]);
-    std::swap(z[k], z[i]);
-    std::swap(r[k], r[i]);
-}
-
-/// Sets row i equal to the bth observable (X_1,...X_n,Z_1,...,Z_n)
-void QStabilizer::rowset(const bitLenInt& i, bitLenInt b)
-{
-    // Dealloc, first
-    x[i] = BoolVector();
-    z[i] = BoolVector();
-
-    x[i] = BoolVector(qubitCount, false);
-    z[i] = BoolVector(qubitCount, false);
-    r[i] = 0;
-
-    if (b < qubitCount) {
-        x[i][b] = true;
-    } else {
-        b -= qubitCount;
-        z[i][b] = true;
-    }
-}
-
 /// Return the phase (0,1,2,3) when row i is LEFT-multiplied by row k
 uint8_t QStabilizer::clifford(const bitLenInt& i, const bitLenInt& k)
 {
@@ -173,16 +147,6 @@ uint8_t QStabilizer::clifford(const bitLenInt& i, const bitLenInt& k)
     e = (e + r[i] + r[k]) & 0x3U;
 
     return e;
-}
-
-/// Left-multiply row i by row k - does not change the logical state
-void QStabilizer::rowmult(const bitLenInt& i, const bitLenInt& k)
-{
-    r[i] = clifford(i, k);
-    for (bitLenInt j = 0; j < qubitCount; j++) {
-        x[i][j] = x[i][j] ^ x[k][j];
-        z[i][j] = z[i][j] ^ z[k][j];
-    }
 }
 
 /**
@@ -357,7 +321,7 @@ real1_f QStabilizer::FirstNonzeroPhase()
     const bitCapIntOcl permCount = pow2Ocl(g);
     const bitCapIntOcl permCountMin1 = permCount - ONE_BCI;
     const bitLenInt elemCount = qubitCount << 1U;
-    const real1_f nrm = sqrt(ONE_R1 / permCount);
+    const real1_f nrm = sqrt((real1_f)(ONE_R1 / permCount));
 
     seed(g);
 
@@ -378,7 +342,7 @@ real1_f QStabilizer::FirstNonzeroPhase()
         }
     }
 
-    return ZERO_R1;
+    return ZERO_R1_F;
 }
 
 /// Convert the state to ket notation (warning: could be huge!)
@@ -391,7 +355,7 @@ void QStabilizer::GetQuantumState(complex* stateVec)
     const bitCapIntOcl permCount = pow2Ocl(g);
     const bitCapIntOcl permCountMin1 = permCount - ONE_BCI;
     const bitLenInt elemCount = qubitCount << 1U;
-    const real1_f nrm = sqrt(ONE_R1 / permCount);
+    const real1_f nrm = sqrt((real1_f)(ONE_R1 / permCount));
 
     seed(g);
 
@@ -420,7 +384,7 @@ void QStabilizer::GetQuantumState(QInterfacePtr eng)
     const bitCapIntOcl permCount = pow2Ocl(g);
     const bitCapIntOcl permCountMin1 = permCount - ONE_BCI;
     const bitLenInt elemCount = qubitCount << 1U;
-    const real1_f nrm = sqrt(ONE_R1 / permCount);
+    const real1_f nrm = sqrt((real1_f)(ONE_R1 / permCount));
 
     seed(g);
 
@@ -450,7 +414,7 @@ void QStabilizer::GetProbs(real1* outputProbs)
     const bitCapIntOcl permCount = pow2Ocl(g);
     const bitCapIntOcl permCountMin1 = permCount - ONE_BCI;
     const bitLenInt elemCount = qubitCount << 1U;
-    const real1_f nrm = sqrt(ONE_R1 / permCount);
+    const real1_f nrm = sqrt((real1_f)(ONE_R1 / permCount));
 
     seed(g);
 
@@ -479,7 +443,7 @@ complex QStabilizer::GetAmplitude(bitCapInt perm)
     const bitCapIntOcl permCount = pow2Ocl(g);
     const bitCapIntOcl permCountMin1 = permCount - ONE_BCI;
     const bitLenInt elemCount = qubitCount << 1U;
-    const real1_f nrm = sqrt(ONE_R1 / permCount);
+    const real1_f nrm = sqrt((real1_f)(ONE_R1 / permCount));
 
     seed(g);
 
@@ -500,7 +464,7 @@ complex QStabilizer::GetAmplitude(bitCapInt perm)
         }
     }
 
-    return ZERO_R1;
+    return ZERO_CMPLX;
 }
 
 /// Apply a CNOT gate with control and target
@@ -889,7 +853,9 @@ bitLenInt QStabilizer::Compose(QStabilizerPtr toCopy, bitLenInt start)
     const bitLenInt rowCount = (qubitCount << 1U) + 1U;
     const bitLenInt length = toCopy->qubitCount;
     const bitLenInt nQubitCount = qubitCount + length;
+    const bitLenInt endLength = qubitCount - start;
     const bitLenInt secondStart = nQubitCount + start;
+    const bitLenInt dLen = length << 1U;
     const BoolVector row(length, 0);
 
     for (bitLenInt i = 0; i < rowCount; i++) {
@@ -897,26 +863,27 @@ bitLenInt QStabilizer::Compose(QStabilizerPtr toCopy, bitLenInt start)
         z[i].insert(z[i].begin() + start, row.begin(), row.end());
     }
 
-    std::vector<BoolVector> xGroup(length, BoolVector(nQubitCount, false));
-    std::vector<BoolVector> zGroup(length, BoolVector(nQubitCount, false));
-    for (bitLenInt i = 0; i < length; i++) {
-        std::copy(toCopy->x[i].begin(), toCopy->x[i].end(), xGroup[i].begin() + start);
-        std::copy(toCopy->z[i].begin(), toCopy->z[i].end(), zGroup[i].begin() + start);
-    }
-    x.insert(x.begin() + start, xGroup.begin(), xGroup.end());
-    z.insert(z.begin() + start, zGroup.begin(), zGroup.end());
+    x.insert(x.begin() + start, toCopy->x.begin(), toCopy->x.begin() + length);
+    z.insert(z.begin() + start, toCopy->z.begin(), toCopy->z.begin() + length);
     r.insert(r.begin() + start, toCopy->r.begin(), toCopy->r.begin() + length);
-
-    std::vector<BoolVector> xGroup2(length, BoolVector(nQubitCount, false));
-    std::vector<BoolVector> zGroup2(length, BoolVector(nQubitCount, false));
     for (bitLenInt i = 0; i < length; i++) {
-        bitLenInt j = length + i;
-        std::copy(toCopy->x[j].begin(), toCopy->x[j].end(), xGroup2[i].begin() + start);
-        std::copy(toCopy->z[j].begin(), toCopy->z[j].end(), zGroup2[i].begin() + start);
+        const bitLenInt offset = start + i;
+        x[offset].insert(x[offset].begin(), start, false);
+        x[offset].insert(x[offset].end(), endLength, false);
+        z[offset].insert(z[offset].begin(), start, false);
+        z[offset].insert(z[offset].end(), endLength, false);
     }
-    x.insert(x.begin() + secondStart, xGroup2.begin(), xGroup2.end());
-    z.insert(z.begin() + secondStart, zGroup2.begin(), zGroup2.end());
-    r.insert(r.begin() + secondStart, toCopy->r.begin() + length, toCopy->r.begin() + (length << 1U));
+
+    x.insert(x.begin() + secondStart, toCopy->x.begin() + length, toCopy->x.begin() + dLen);
+    z.insert(z.begin() + secondStart, toCopy->z.begin() + length, toCopy->z.begin() + dLen);
+    r.insert(r.begin() + secondStart, toCopy->r.begin() + length, toCopy->r.begin() + dLen);
+    for (bitLenInt i = 0; i < length; i++) {
+        const bitLenInt offset = secondStart + i;
+        x[offset].insert(x[offset].begin(), start, false);
+        x[offset].insert(x[offset].end(), endLength, false);
+        z[offset].insert(z[offset].begin(), start, false);
+        z[offset].insert(z[offset].end(), endLength, false);
+    }
 
     qubitCount = nQubitCount;
 
@@ -1038,17 +1005,17 @@ void QStabilizer::DecomposeDispose(const bitLenInt start, const bitLenInt length
 real1_f QStabilizer::ApproxCompareHelper(QStabilizerPtr toCompare, bool isDiscreteBool, real1_f error_tol)
 {
     if (!toCompare) {
-        return ONE_R1;
+        return ONE_R1_F;
     }
 
     if (this == toCompare.get()) {
-        return ZERO_R1;
+        return ZERO_R1_F;
     }
 
     // If the qubit counts are unequal, these can't be approximately equal objects.
     if (qubitCount != toCompare->qubitCount) {
         // Max square difference:
-        return ONE_R1;
+        return ONE_R1_F;
     }
 
     toCompare->Finish();
@@ -1058,43 +1025,43 @@ real1_f QStabilizer::ApproxCompareHelper(QStabilizerPtr toCompare, bool isDiscre
     complex proj = ZERO_CMPLX;
 
     if (isDiscreteBool) {
-        real1_f potential = ZERO_R1;
-        real1_f oPotential = ZERO_R1;
+        real1_f potential = ZERO_R1_F;
+        real1_f oPotential = ZERO_R1_F;
         for (bitCapInt i = 0U; i < maxQPower; i++) {
             const complex amp = GetAmplitude(i);
             const complex oAmp = toCompare->GetAmplitude(i);
 
-            potential += norm(amp);
-            oPotential += norm(oAmp);
+            potential += (real1_f)norm(amp);
+            oPotential += (real1_f)norm(oAmp);
             if ((potential - oPotential) > error_tol) {
-                return ONE_R1;
+                return ONE_R1_F;
             }
 
             proj += conj(amp) * oAmp;
-            const real1_f prob = clampProb(norm(proj));
+            const real1_f prob = clampProb((real1_f)norm(proj));
             if (error_tol >= (ONE_R1 - prob)) {
-                return ZERO_R1;
+                return ZERO_R1_F;
             }
         }
 
-        return ONE_R1 - clampProb(norm(proj));
+        return ONE_R1_F - clampProb((real1_f)norm(proj));
     }
 
     for (bitCapInt i = 0U; i < maxQPower; i++) {
         proj += conj(GetAmplitude(i)) * toCompare->GetAmplitude(i);
     }
 
-    return ONE_R1 - clampProb(norm(proj));
+    return ONE_R1_F - clampProb((real1_f)norm(proj));
 }
 
 real1_f QStabilizer::Prob(bitLenInt qubit)
 {
     if (IsSeparableZ(qubit)) {
-        return M(qubit) ? ONE_R1 : ZERO_R1;
+        return M(qubit) ? ONE_R1_F : ZERO_R1_F;
     }
 
     // Otherwise, state appears locally maximally mixed.
-    return ONE_R1 / 2;
+    return ONE_R1_F / 2;
 }
 
 void QStabilizer::Mtrx(const complex* mtrx, bitLenInt target)
@@ -1304,36 +1271,6 @@ void QStabilizer::Invert(complex topRight, complex bottomLeft, bitLenInt target)
     }
 
     throw std::domain_error("QStabilizer::Invert() not implemented for non-Clifford/Pauli cases!");
-}
-
-void QStabilizer::MCMtrx(const bitLenInt* lControls, bitLenInt lControlLen, const complex* mtrx, bitLenInt target)
-{
-    if (IS_NORM_0(mtrx[1]) && IS_NORM_0(mtrx[2])) {
-        MCPhase(lControls, lControlLen, mtrx[0], mtrx[3], target);
-        return;
-    }
-
-    if (IS_NORM_0(mtrx[0]) && IS_NORM_0(mtrx[3])) {
-        MCInvert(lControls, lControlLen, mtrx[1], mtrx[2], target);
-        return;
-    }
-
-    throw std::domain_error("QStabilizer::MCMtrx() not implemented for non-Clifford/Pauli cases!");
-}
-
-void QStabilizer::MACMtrx(const bitLenInt* lControls, bitLenInt lControlLen, const complex* mtrx, bitLenInt target)
-{
-    if (IS_NORM_0(mtrx[1]) && IS_NORM_0(mtrx[2])) {
-        MACPhase(lControls, lControlLen, mtrx[0], mtrx[3], target);
-        return;
-    }
-
-    if (IS_NORM_0(mtrx[0]) && IS_NORM_0(mtrx[3])) {
-        MACInvert(lControls, lControlLen, mtrx[1], mtrx[2], target);
-        return;
-    }
-
-    throw std::domain_error("QStabilizer::MACMtrx() not implemented for non-Clifford/Pauli cases!");
 }
 
 void QStabilizer::MCPhase(
@@ -1649,5 +1586,20 @@ void QStabilizer::FSim(real1_f theta, real1_f phi, bitLenInt qubit1, bitLenInt q
     }
 
     throw std::domain_error("QStabilizer::FSim() not implemented for non-Clifford/Pauli cases!");
+}
+
+bool QStabilizer::TrySeparate(const bitLenInt* qubits, bitLenInt length, real1_f ignored)
+{
+    for (bitLenInt i = 0U; i < length; i++) {
+        Swap(qubits[i], i);
+    }
+
+    const bool toRet = CanDecomposeDispose(0U, 2U);
+
+    for (bitLenInt i = 0U; i < length; i++) {
+        Swap(qubits[i], i);
+    }
+
+    return toRet;
 }
 } // namespace Qrack

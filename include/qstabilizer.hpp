@@ -93,27 +93,13 @@ protected:
         });
     }
 
-    bool TrimControls(const bitLenInt* lControls, bitLenInt lControlLen, bool isAnti, std::vector<bitLenInt>& output)
-    {
-        for (bitLenInt i = 0; i < lControlLen; i++) {
-            const bitLenInt bit = lControls[i];
-            if (!IsSeparableZ(bit)) {
-                output.push_back(bit);
-                continue;
-            }
-            if (isAnti == M(bit)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
+    bool TrimControls(const bitLenInt* lControls, bitLenInt lControlLen, bool isAnti, std::vector<bitLenInt>& output);
 
 public:
     QStabilizer(bitLenInt n, bitCapInt perm = 0, qrack_rand_gen_ptr rgp = nullptr, complex ignored = CMPLX_DEFAULT_ARG,
         bool doNorm = false, bool randomGlobalPhase = true, bool ignored2 = false, int ignored3 = -1,
         bool useHardwareRNG = true, bool ignored4 = false, real1_f ignored5 = REAL1_EPSILON,
-        std::vector<int> ignored6 = {}, bitLenInt ignored7 = 0, real1_f ignored8 = FP_NORM_EPSILON);
+        std::vector<int> ignored6 = {}, bitLenInt ignored7 = 0, real1_f ignored8 = FP_NORM_EPSILON_F);
 
     QInterfacePtr Clone()
     {
@@ -132,10 +118,10 @@ public:
         return clone;
     }
 
-    virtual ~QStabilizer() { Dump(); }
+    ~QStabilizer() { Dump(); }
 
-    virtual bool isClifford() { return true; };
-    virtual bool isClifford(bitLenInt qubit) { return true; };
+    bool isClifford() { return true; };
+    bool isClifford(bitLenInt qubit) { return true; };
 
     void Finish()
     {
@@ -164,7 +150,7 @@ public:
 
     bitCapInt GetMaxQPower() { return pow2(qubitCount); }
 
-    virtual void SetPermutation(bitCapInt perm, complex phaseFac = CMPLX_DEFAULT_ARG);
+    void SetPermutation(bitCapInt perm, complex phaseFac = CMPLX_DEFAULT_ARG);
 
     void SetRandomSeed(uint32_t seed)
     {
@@ -190,15 +176,56 @@ public:
 
 protected:
     /// Sets row i equal to row k
-    void rowcopy(const bitLenInt& i, const bitLenInt& k);
-    /// Swaps row i and row k
-    void rowswap(const bitLenInt& i, const bitLenInt& k);
+    void rowcopy(const bitLenInt& i, const bitLenInt& k)
+    {
+        if (i == k) {
+            return;
+        }
+
+        x[i] = x[k];
+        z[i] = z[k];
+        r[i] = r[k];
+    }
+    /// Swaps row i and row k - does not change the logical state
+    void rowswap(const bitLenInt& i, const bitLenInt& k)
+    {
+        if (i == k) {
+            return;
+        }
+
+        std::swap(x[k], x[i]);
+        std::swap(z[k], z[i]);
+        std::swap(r[k], r[i]);
+    }
     /// Sets row i equal to the bth observable (X_1,...X_n,Z_1,...,Z_n)
-    void rowset(const bitLenInt& i, bitLenInt b);
+    void rowset(const bitLenInt& i, bitLenInt b)
+    {
+        // Dealloc, first
+        x[i] = BoolVector();
+        z[i] = BoolVector();
+
+        x[i] = BoolVector(qubitCount, false);
+        z[i] = BoolVector(qubitCount, false);
+        r[i] = 0;
+
+        if (b < qubitCount) {
+            x[i][b] = true;
+        } else {
+            b -= qubitCount;
+            z[i][b] = true;
+        }
+    }
+    /// Left-multiply row i by row k - does not change the logical state
+    void rowmult(const bitLenInt& i, const bitLenInt& k)
+    {
+        r[i] = clifford(i, k);
+        for (bitLenInt j = 0; j < qubitCount; j++) {
+            x[i][j] = x[i][j] ^ x[k][j];
+            z[i][j] = z[i][j] ^ z[k][j];
+        }
+    }
     /// Return the phase (0,1,2,3) when row i is LEFT-multiplied by row k
     uint8_t clifford(const bitLenInt& i, const bitLenInt& k);
-    /// Left-multiply row i by row k
-    void rowmult(const bitLenInt& i, const bitLenInt& k);
 
     /**
      * Do Gaussian elimination to put the stabilizer generators in the following form:
@@ -238,9 +265,9 @@ public:
 
         SetPermutation(0);
 
-        const real1 prob = (real1)clampProb(norm(inputState[1]));
+        const real1 prob = (real1)clampProb((real1_f)norm(inputState[1]));
         const real1 sqrtProb = sqrt(prob);
-        const real1 sqrt1MinProb = (real1)sqrt(clampProb(ONE_R1 - prob));
+        const real1 sqrt1MinProb = (real1)sqrt(clampProb((real1_f)(ONE_R1 - prob)));
         const complex phase0 = std::polar(ONE_R1, arg(inputState[0]));
         const complex phase1 = std::polar(ONE_R1, arg(inputState[1]));
         const complex mtrx[4] = { sqrt1MinProb * phase0, sqrtProb * phase0, sqrtProb * phase1, -sqrt1MinProb * phase1 };
@@ -252,37 +279,37 @@ public:
     }
 
     /// Apply a CNOT gate with control and target
-    virtual void CNOT(bitLenInt control, bitLenInt target);
+    void CNOT(bitLenInt control, bitLenInt target);
     /// Apply a CY gate with control and target
-    virtual void CY(bitLenInt control, bitLenInt target);
+    void CY(bitLenInt control, bitLenInt target);
     /// Apply a CZ gate with control and target
-    virtual void CZ(bitLenInt control, bitLenInt target);
+    void CZ(bitLenInt control, bitLenInt target);
     /// Apply an (anti-)CNOT gate with control and target
-    virtual void AntiCNOT(bitLenInt control, bitLenInt target);
+    void AntiCNOT(bitLenInt control, bitLenInt target);
     /// Apply an (anti-)CY gate with control and target
-    virtual void AntiCY(bitLenInt control, bitLenInt target);
+    void AntiCY(bitLenInt control, bitLenInt target);
     /// Apply an (anti-)CZ gate with control and target
-    virtual void AntiCZ(bitLenInt control, bitLenInt target);
+    void AntiCZ(bitLenInt control, bitLenInt target);
     /// Apply a Hadamard gate to target
-    virtual void H(bitLenInt qubitIndex);
+    void H(bitLenInt qubitIndex);
     /// Apply a phase gate (|0>->|0>, |1>->i|1>, or "S") to qubit b
-    virtual void S(bitLenInt qubitIndex);
+    void S(bitLenInt qubitIndex);
     /// Apply an inverse phase gate (|0>->|0>, |1>->-i|1>, or "S adjoint") to qubit b
-    virtual void IS(bitLenInt qubitIndex);
+    void IS(bitLenInt qubitIndex);
     /// Apply a phase gate (|0>->|0>, |1>->-|1>, or "Z") to qubit b
-    virtual void Z(bitLenInt qubitIndex);
+    void Z(bitLenInt qubitIndex);
     /// Apply an X (or NOT) gate to target
-    virtual void X(bitLenInt qubitIndex);
+    void X(bitLenInt qubitIndex);
     /// Apply a Pauli Y gate to target
-    virtual void Y(bitLenInt qubitIndex);
-
-    virtual void Swap(bitLenInt qubitIndex1, bitLenInt qubitIndex2);
+    void Y(bitLenInt qubitIndex);
+    // Swap two bits
+    void Swap(bitLenInt qubitIndex1, bitLenInt qubitIndex2);
 
     /// Measure qubit t
-    virtual bool ForceM(bitLenInt t, bool result, bool doForce = true, bool doApply = true);
+    bool ForceM(bitLenInt t, bool result, bool doForce = true, bool doApply = true);
 
     /// Measure all qubits
-    virtual bitCapInt MAll()
+    bitCapInt MAll()
     {
         bitCapInt toRet = QInterface::MAll();
         SetPermutation(toRet);
@@ -290,19 +317,19 @@ public:
     }
 
     /// Get the phase radians of the lowest permutation nonzero amplitude
-    virtual real1_f FirstNonzeroPhase();
+    real1_f FirstNonzeroPhase();
 
     /// Convert the state to ket notation
-    virtual void GetQuantumState(complex* stateVec);
+    void GetQuantumState(complex* stateVec);
 
     /// Convert the state to ket notation, directly into another QInterface
-    virtual void GetQuantumState(QInterfacePtr eng);
+    void GetQuantumState(QInterfacePtr eng);
 
     /// Get all probabilities corresponding to ket notation
-    virtual void GetProbs(real1* outputProbs);
+    void GetProbs(real1* outputProbs);
 
     /// Get a single basis state amplitude
-    virtual complex GetAmplitude(bitCapInt perm);
+    complex GetAmplitude(bitCapInt perm);
 
     /**
      * Returns "true" if target qubit is a Z basis eigenstate
@@ -326,79 +353,92 @@ public:
     uint8_t IsSeparable(const bitLenInt& target);
 
     using QInterface::Compose;
-    virtual bitLenInt Compose(QInterfacePtr toCopy) { return Compose(std::dynamic_pointer_cast<QStabilizer>(toCopy)); }
-    virtual bitLenInt Compose(QStabilizerPtr toCopy) { return Compose(toCopy, qubitCount); }
-    virtual bitLenInt Compose(QInterfacePtr toCopy, bitLenInt start)
+    bitLenInt Compose(QInterfacePtr toCopy) { return Compose(std::dynamic_pointer_cast<QStabilizer>(toCopy)); }
+    bitLenInt Compose(QStabilizerPtr toCopy) { return Compose(toCopy, qubitCount); }
+    bitLenInt Compose(QInterfacePtr toCopy, bitLenInt start)
     {
         return Compose(std::dynamic_pointer_cast<QStabilizer>(toCopy), start);
     }
-    virtual bitLenInt Compose(QStabilizerPtr toCopy, bitLenInt start);
-    virtual void Decompose(bitLenInt start, QInterfacePtr dest)
+    bitLenInt Compose(QStabilizerPtr toCopy, bitLenInt start);
+    void Decompose(bitLenInt start, QInterfacePtr dest)
     {
         DecomposeDispose(start, dest->GetQubitCount(), std::dynamic_pointer_cast<QStabilizer>(dest));
     }
-    virtual QInterfacePtr Decompose(bitLenInt start, bitLenInt length);
-    virtual void Dispose(bitLenInt start, bitLenInt length) { DecomposeDispose(start, length, (QStabilizerPtr)NULL); }
-    virtual void Dispose(bitLenInt start, bitLenInt length, bitCapInt ignored)
+    QInterfacePtr Decompose(bitLenInt start, bitLenInt length);
+    void Dispose(bitLenInt start, bitLenInt length) { DecomposeDispose(start, length, (QStabilizerPtr)NULL); }
+    void Dispose(bitLenInt start, bitLenInt length, bitCapInt ignored)
     {
         DecomposeDispose(start, length, (QStabilizerPtr)NULL);
     }
     bool CanDecomposeDispose(const bitLenInt start, const bitLenInt length);
 
-    virtual void NormalizeState(
-        real1_f nrm = REAL1_DEFAULT_ARG, real1_f norm_thresh = REAL1_DEFAULT_ARG, real1_f phaseArg = ZERO_R1)
+    void NormalizeState(
+        real1_f nrm = REAL1_DEFAULT_ARG, real1_f norm_thresh = REAL1_DEFAULT_ARG, real1_f phaseArg = ZERO_R1_F)
     {
         if (!randGlobalPhase) {
             phaseOffset *= std::polar(ONE_R1, (real1)phaseArg);
         }
     }
-    virtual void UpdateRunningNorm(real1_f norm_thresh = REAL1_DEFAULT_ARG)
+    void UpdateRunningNorm(real1_f norm_thresh = REAL1_DEFAULT_ARG)
     {
         // Intentionally left blank
     }
 
-    virtual real1_f SumSqrDiff(QInterfacePtr toCompare)
+    real1_f SumSqrDiff(QInterfacePtr toCompare)
     {
         return ApproxCompareHelper(std::dynamic_pointer_cast<QStabilizer>(toCompare), false);
     }
-    virtual bool ApproxCompare(QInterfacePtr toCompare, real1_f error_tol = TRYDECOMPOSE_EPSILON)
+    bool ApproxCompare(QInterfacePtr toCompare, real1_f error_tol = TRYDECOMPOSE_EPSILON)
     {
         return error_tol >= ApproxCompareHelper(std::dynamic_pointer_cast<QStabilizer>(toCompare), true, error_tol);
     }
 
-    virtual real1_f Prob(bitLenInt qubit);
+    real1_f Prob(bitLenInt qubit);
 
-    virtual void Mtrx(const complex* mtrx, bitLenInt target);
-    virtual void Phase(complex topLeft, complex bottomRight, bitLenInt target);
-    virtual void Invert(complex topRight, complex bottomLeft, bitLenInt target);
-    virtual void MCMtrx(const bitLenInt* controls, bitLenInt controlLen, const complex* mtrx, bitLenInt target);
-    virtual void MCPhase(
+    void Mtrx(const complex* mtrx, bitLenInt target);
+    void Phase(complex topLeft, complex bottomRight, bitLenInt target);
+    void Invert(complex topRight, complex bottomLeft, bitLenInt target);
+    void MCPhase(
         const bitLenInt* controls, bitLenInt controlLen, complex topLeft, complex bottomRight, bitLenInt target);
-    virtual void MCInvert(
-        const bitLenInt* controls, bitLenInt controlLen, complex topRight, complex bottomLeft, bitLenInt target);
-    virtual void MACMtrx(const bitLenInt* controls, bitLenInt controlLen, const complex* mtrx, bitLenInt target);
-    virtual void MACPhase(
+    void MACPhase(
         const bitLenInt* controls, bitLenInt controlLen, complex topLeft, complex bottomRight, bitLenInt target);
-    virtual void MACInvert(
+    void MCInvert(
         const bitLenInt* controls, bitLenInt controlLen, complex topRight, complex bottomLeft, bitLenInt target);
-    virtual void FSim(real1_f theta, real1_f phi, bitLenInt qubit1, bitLenInt qubit2);
-
-    virtual bool TrySeparate(const bitLenInt* qubits, bitLenInt length, real1_f ignored)
+    void MACInvert(
+        const bitLenInt* controls, bitLenInt controlLen, complex topRight, complex bottomLeft, bitLenInt target);
+    void MCMtrx(const bitLenInt* controls, bitLenInt controlLen, const complex* mtrx, bitLenInt target)
     {
-        for (bitLenInt i = 0U; i < length; i++) {
-            Swap(qubits[i], i);
+        if (IS_NORM_0(mtrx[1]) && IS_NORM_0(mtrx[2])) {
+            MCPhase(controls, controlLen, mtrx[0], mtrx[3], target);
+            return;
         }
 
-        const bool toRet = CanDecomposeDispose(0U, 2U);
-
-        for (bitLenInt i = 0U; i < length; i++) {
-            Swap(qubits[i], i);
+        if (IS_NORM_0(mtrx[0]) && IS_NORM_0(mtrx[3])) {
+            MCInvert(controls, controlLen, mtrx[1], mtrx[2], target);
+            return;
         }
 
-        return toRet;
+        throw std::domain_error("QStabilizer::MCMtrx() not implemented for non-Clifford/Pauli cases!");
     }
-    virtual bool TrySeparate(bitLenInt qubit) { return CanDecomposeDispose(qubit, 1U); }
-    virtual bool TrySeparate(bitLenInt qubit1, bitLenInt qubit2)
+    void MACMtrx(const bitLenInt* controls, bitLenInt controlLen, const complex* mtrx, bitLenInt target)
+    {
+        if (IS_NORM_0(mtrx[1]) && IS_NORM_0(mtrx[2])) {
+            MACPhase(controls, controlLen, mtrx[0], mtrx[3], target);
+            return;
+        }
+
+        if (IS_NORM_0(mtrx[0]) && IS_NORM_0(mtrx[3])) {
+            MACInvert(controls, controlLen, mtrx[1], mtrx[2], target);
+            return;
+        }
+
+        throw std::domain_error("QStabilizer::MACMtrx() not implemented for non-Clifford/Pauli cases!");
+    }
+    void FSim(real1_f theta, real1_f phi, bitLenInt qubit1, bitLenInt qubit2);
+
+    bool TrySeparate(const bitLenInt* qubits, bitLenInt length, real1_f ignored);
+    bool TrySeparate(bitLenInt qubit) { return CanDecomposeDispose(qubit, 1U); }
+    bool TrySeparate(bitLenInt qubit1, bitLenInt qubit2)
     {
         Swap(qubit1, 0U);
         Swap(qubit2, 1U);
