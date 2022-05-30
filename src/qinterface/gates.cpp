@@ -367,11 +367,11 @@ void QInterface::AntiCIPhaseRootN(bitLenInt n, bitLenInt control, bitLenInt targ
 void QInterface::UniformlyControlledSingleBit(const bitLenInt* controls, bitLenInt controlLen, bitLenInt qubitIndex,
     const complex* mtrxs, const bitCapInt* mtrxSkipPowers, bitLenInt mtrxSkipLen, bitCapInt mtrxSkipValueMask)
 {
-    for (bitLenInt bit_pos = 0U; bit_pos < controlLen; bit_pos++) {
+    for (bitLenInt bit_pos = 0U; bit_pos < controlLen; ++bit_pos) {
         X(controls[bit_pos]);
     }
     const bitCapInt maxI = pow2(controlLen);
-    for (bitCapInt lcv = 0U; lcv < maxI; lcv++) {
+    for (bitCapInt lcv = 0U; lcv < maxI; ++lcv) {
         const bitCapInt index = pushApartBits(lcv, mtrxSkipPowers, mtrxSkipLen) | mtrxSkipValueMask;
         MCMtrx(controls, controlLen, mtrxs + (bitCapIntOcl)(index * 4U), qubitIndex);
 
@@ -380,7 +380,7 @@ void QInterface::UniformlyControlledSingleBit(const bitLenInt* controls, bitLenI
         }
 
         const bitCapInt lcvDiff = lcv ^ (lcv + ONE_BCI);
-        for (bitLenInt bit_pos = 0U; bit_pos < controlLen; bit_pos++) {
+        for (bitLenInt bit_pos = 0U; bit_pos < controlLen; ++bit_pos) {
             if ((lcvDiff >> bit_pos) & ONE_BCI) {
                 X(controls[bit_pos]);
             }
@@ -403,7 +403,7 @@ void QInterface::ZeroPhaseFlip(bitLenInt start, bitLenInt length)
 
     const bitLenInt min1 = length - 1U;
     std::unique_ptr<bitLenInt[]> controls(new bitLenInt[min1]);
-    for (bitLenInt i = 0; i < min1; i++) {
+    for (bitLenInt i = 0U; i < min1; ++i) {
         controls[i] = start + i;
     }
     MACPhase(controls.get(), min1, -ONE_CMPLX, ONE_CMPLX, start + min1);
@@ -442,11 +442,11 @@ void QInterface::YMask(bitCapInt mask)
     }
 
     if (parity == 1) {
-        Phase(I_CMPLX, I_CMPLX, 0);
+        Phase(I_CMPLX, I_CMPLX, 0U);
     } else if (parity == 2) {
         PhaseFlip();
     } else if (parity == 3) {
-        Phase(-I_CMPLX, -I_CMPLX, 0);
+        Phase(-I_CMPLX, -I_CMPLX, 0U);
     }
 }
 
@@ -483,6 +483,20 @@ void QInterface::ISwap(bitLenInt q1, bitLenInt q2)
     CNOT(q1, q2);
     CNOT(q2, q1);
     H(q2);
+}
+
+void QInterface::IISwap(bitLenInt q1, bitLenInt q2)
+{
+    if (q1 == q2) {
+        return;
+    }
+
+    H(q2);
+    CNOT(q2, q1);
+    CNOT(q1, q2);
+    H(q1);
+    IS(q2);
+    IS(q1);
 }
 
 void QInterface::SqrtSwap(bitLenInt q1, bitLenInt q2)
@@ -557,13 +571,13 @@ void QInterface::CSwap(const bitLenInt* controls, bitLenInt controlLen, bitLenIn
 
 void QInterface::AntiCSwap(const bitLenInt* controls, bitLenInt controlLen, bitLenInt q1, bitLenInt q2)
 {
-    for (bitLenInt i = 0U; i < controlLen; i++) {
+    for (bitLenInt i = 0U; i < controlLen; ++i) {
         X(controls[i]);
     }
 
     CSwap(controls, controlLen, q1, q2);
 
-    for (bitLenInt i = 0U; i < controlLen; i++) {
+    for (bitLenInt i = 0U; i < controlLen; ++i) {
         X(controls[i]);
     }
 }
@@ -665,26 +679,26 @@ void QInterface::CISqrtSwap(const bitLenInt* controls, bitLenInt controlLen, bit
 
 void QInterface::AntiCSqrtSwap(const bitLenInt* controls, bitLenInt controlLen, bitLenInt q1, bitLenInt q2)
 {
-    for (bitLenInt i = 0U; i < controlLen; i++) {
+    for (bitLenInt i = 0U; i < controlLen; ++i) {
         X(controls[i]);
     }
 
     CSqrtSwap(controls, controlLen, q1, q2);
 
-    for (bitLenInt i = 0U; i < controlLen; i++) {
+    for (bitLenInt i = 0U; i < controlLen; ++i) {
         X(controls[i]);
     }
 }
 
 void QInterface::AntiCISqrtSwap(const bitLenInt* controls, bitLenInt controlLen, bitLenInt q1, bitLenInt q2)
 {
-    for (bitLenInt i = 0U; i < controlLen; i++) {
+    for (bitLenInt i = 0U; i < controlLen; ++i) {
         X(controls[i]);
     }
 
     CISqrtSwap(controls, controlLen, q1, q2);
 
-    for (bitLenInt i = 0U; i < controlLen; i++) {
+    for (bitLenInt i = 0U; i < controlLen; ++i) {
         X(controls[i]);
     }
 }
@@ -703,14 +717,14 @@ void QInterface::PhaseParity(real1_f radians, bitCapInt mask)
         mask = v;
     }
 
-    const int end = (int)(qubits.size() - 1);
-    for (int i = 0; i < end; i++) {
+    const bitLenInt end = qubits.size() - 1U;
+    for (bitLenInt i = 0; i < end; ++i) {
         CNOT(qubits[i], qubits[i + 1U]);
     }
     real1 cosine = (real1)cos(radians / 2);
     real1 sine = (real1)sin(radians / 2);
     Phase(cosine - I_CMPLX * sine, cosine + I_CMPLX * sine, qubits[end]);
-    for (int i = (end - 1U); i >= 0; i--) {
+    for (int i = (end - 1); i >= 0; --i) {
         CNOT(qubits[i], qubits[i + 1U]);
     }
 }
@@ -726,7 +740,7 @@ void QInterface::TimeEvolve(Hamiltonian h, real1_f timeDiff_f)
     // Exponentiation of an arbitrary serial string of gates, each HamiltonianOp component times timeDiff, e^(-i * H *
     // t) as e^(-i * H_(N - 1) * t) * e^(-i * H_(N - 2) * t) * ... e^(-i * H_0 * t)
 
-    for (size_t i = 0; i < h.size(); i++) {
+    for (size_t i = 0U; i < h.size(); ++i) {
         HamiltonianOpPtr op = h[i];
         complex* opMtrx = op->matrix.get();
 
@@ -736,12 +750,12 @@ void QInterface::TimeEvolve(Hamiltonian h, real1_f timeDiff_f)
         }
         std::unique_ptr<complex[]> mtrx(new complex[maxJ]);
 
-        for (bitCapIntOcl j = 0; j < maxJ; j++) {
+        for (bitCapIntOcl j = 0U; j < maxJ; ++j) {
             mtrx[j] = opMtrx[j] * (-timeDiff);
         }
 
         if (op->toggles) {
-            for (bitLenInt j = 0; j < op->controlLen; j++) {
+            for (bitLenInt j = 0U; j < op->controlLen; ++j) {
                 if (op->toggles[j]) {
                     X(op->controls[j]);
                 }
@@ -750,7 +764,7 @@ void QInterface::TimeEvolve(Hamiltonian h, real1_f timeDiff_f)
 
         if (op->uniform) {
             std::unique_ptr<complex[]> expMtrx(new complex[maxJ]);
-            for (bitCapIntOcl j = 0; j < pow2(op->controlLen); j++) {
+            for (bitCapIntOcl j = 0U; j < pow2(op->controlLen); ++j) {
                 exp2x2(mtrx.get() + (j * 4U), expMtrx.get() + (j * 4U));
             }
             UniformlyControlledSingleBit(op->controls, op->controlLen, op->targetBit, expMtrx.get());
@@ -768,7 +782,7 @@ void QInterface::TimeEvolve(Hamiltonian h, real1_f timeDiff_f)
         }
 
         if (op->toggles) {
-            for (bitLenInt j = 0; j < op->controlLen; j++) {
+            for (bitLenInt j = 0U; j < op->controlLen; ++j) {
                 if (op->toggles[j]) {
                     X(op->controls[j]);
                 }

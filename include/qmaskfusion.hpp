@@ -66,7 +66,7 @@ protected:
     void DumpBuffers(bitLenInt start, bitLenInt length)
     {
         bitLenInt maxLcv = start + length;
-        for (bitLenInt i = start; i < maxLcv; i++) {
+        for (bitLenInt i = start; i < maxLcv; ++i) {
             DumpBuffer(i);
         }
     }
@@ -98,7 +98,7 @@ protected:
         }
 
         bitLenInt maxLcv = start + length;
-        for (bitLenInt i = start; i < maxLcv; i++) {
+        for (bitLenInt i = start; i < maxLcv; ++i) {
             if (zxShards[i].isBuffered()) {
                 FlushBuffers();
                 return true;
@@ -117,7 +117,7 @@ protected:
         }
 
         bool isBlocked = false;
-        for (bitLenInt i = 0U; i < controlLen; i++) {
+        for (bitLenInt i = 0U; i < controlLen; ++i) {
             bitLenInt control = controls[i];
             isBlocked = zxShards[control].isX;
             if (isBlocked) {
@@ -154,7 +154,7 @@ protected:
 
         bool isBlocked = false;
         bitLenInt maxLcv = start + length;
-        for (bitLenInt i = start; i < maxLcv; i++) {
+        for (bitLenInt i = start; i < maxLcv; ++i) {
             isBlocked = zxShards[i].isX;
             if (isBlocked) {
                 break;
@@ -168,15 +168,15 @@ protected:
     }
 
 public:
-    QMaskFusion(std::vector<QInterfaceEngine> eng, bitLenInt qBitCount, bitCapInt initState = 0,
+    QMaskFusion(std::vector<QInterfaceEngine> eng, bitLenInt qBitCount, bitCapInt initState = 0U,
         qrack_rand_gen_ptr rgp = nullptr, complex phaseFac = CMPLX_DEFAULT_ARG, bool doNorm = false,
         bool randomGlobalPhase = true, bool useHostMem = false, int deviceId = -1, bool useHardwareRNG = true,
         bool useSparseStateVec = false, real1_f norm_thresh = REAL1_EPSILON, std::vector<int> devList = {},
-        bitLenInt qubitThreshold = 0, real1_f separation_thresh = FP_NORM_EPSILON_F);
-    QMaskFusion(bitLenInt qBitCount, bitCapInt initState = 0, qrack_rand_gen_ptr rgp = nullptr,
+        bitLenInt qubitThreshold = 0U, real1_f separation_thresh = FP_NORM_EPSILON_F);
+    QMaskFusion(bitLenInt qBitCount, bitCapInt initState = 0U, qrack_rand_gen_ptr rgp = nullptr,
         complex phaseFac = CMPLX_DEFAULT_ARG, bool doNorm = false, bool randomGlobalPhase = true,
         bool useHostMem = false, int deviceId = -1, bool useHardwareRNG = true, bool useSparseStateVec = false,
-        real1_f norm_thresh = REAL1_EPSILON, std::vector<int> devList = {}, bitLenInt qubitThreshold = 0,
+        real1_f norm_thresh = REAL1_EPSILON, std::vector<int> devList = {}, bitLenInt qubitThreshold = 0U,
         real1_f separation_thresh = FP_NORM_EPSILON_F)
         : QMaskFusion({ QINTERFACE_OPTIMAL_BASE }, qBitCount, initState, rgp, phaseFac, doNorm, randomGlobalPhase,
               useHostMem, deviceId, useHardwareRNG, useSparseStateVec, norm_thresh, devList, qubitThreshold,
@@ -368,8 +368,8 @@ public:
 
     void MCMtrx(const bitLenInt* controls, bitLenInt controlLen, const complex* mtrx, bitLenInt target)
     {
-        if (IS_NORM_0(mtrx[1]) && IS_NORM_0(mtrx[2])) {
-            MCPhase(controls, controlLen, mtrx[0], mtrx[3], target);
+        if (IS_NORM_0(mtrx[1U]) && IS_NORM_0(mtrx[2U])) {
+            MCPhase(controls, controlLen, mtrx[0U], mtrx[3U], target);
             return;
         }
 
@@ -378,8 +378,8 @@ public:
     }
     void MACMtrx(const bitLenInt* controls, bitLenInt controlLen, const complex* mtrx, bitLenInt target)
     {
-        if (IS_NORM_0(mtrx[1]) && IS_NORM_0(mtrx[2])) {
-            MACPhase(controls, controlLen, mtrx[0], mtrx[3], target);
+        if (IS_NORM_0(mtrx[1U]) && IS_NORM_0(mtrx[2U])) {
+            MACPhase(controls, controlLen, mtrx[0U], mtrx[3U], target);
             return;
         }
 
@@ -585,6 +585,11 @@ public:
         FlushIfBuffered(qubitIndex1) || FlushIfBuffered(qubitIndex2);
         engine->ISwap(qubitIndex1, qubitIndex2);
     }
+    void IISwap(bitLenInt qubitIndex1, bitLenInt qubitIndex2)
+    {
+        FlushIfBuffered(qubitIndex1) || FlushIfBuffered(qubitIndex2);
+        engine->IISwap(qubitIndex1, qubitIndex2);
+    }
     void SqrtSwap(bitLenInt qubitIndex1, bitLenInt qubitIndex2)
     {
         FlushIfBuffered(qubitIndex1) || FlushIfBuffered(qubitIndex2);
@@ -667,10 +672,10 @@ public:
 
     QInterfacePtr Clone();
 
-    void SetDevice(int dID, bool forceReInit = false)
+    void SetDevice(int dID)
     {
         devID = dID;
-        engine->SetDevice(dID, forceReInit);
+        engine->SetDevice(dID);
     }
 
     int64_t GetDeviceID() { return devID; }

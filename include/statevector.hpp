@@ -255,7 +255,7 @@ public:
         }
 
         std::lock_guard<std::mutex> lock(mtx);
-        for (bitCapIntOcl i = 0; i < capacity; i++) {
+        for (bitCapIntOcl i = 0U; i < capacity; ++i) {
             if (copyIn[i] == ZERO_CMPLX) {
                 amplitudes.erase(i);
             } else {
@@ -268,7 +268,7 @@ public:
     {
         if (!copyIn) {
             std::lock_guard<std::mutex> lock(mtx);
-            for (bitCapIntOcl i = 0; i < length; i++) {
+            for (bitCapIntOcl i = 0U; i < length; ++i) {
                 amplitudes.erase(i);
             }
 
@@ -276,7 +276,7 @@ public:
         }
 
         std::lock_guard<std::mutex> lock(mtx);
-        for (bitCapIntOcl i = 0; i < length; i++) {
+        for (bitCapIntOcl i = 0U; i < length; ++i) {
             if (copyIn[i] == ZERO_CMPLX) {
                 amplitudes.erase(i);
             } else {
@@ -292,7 +292,7 @@ public:
 
         if (!copyIn) {
             std::lock_guard<std::mutex> lock(mtx);
-            for (bitCapIntOcl i = 0; i < length; i++) {
+            for (bitCapIntOcl i = 0U; i < length; ++i) {
                 amplitudes.erase(i + srcOffset);
             }
 
@@ -300,7 +300,7 @@ public:
         }
 
         std::lock_guard<std::mutex> lock(mtx);
-        for (bitCapIntOcl i = 0; i < length; i++) {
+        for (bitCapIntOcl i = 0U; i < length; ++i) {
             complex amp = copyIn->read(i + srcOffset);
             if (amp == ZERO_CMPLX) {
                 amplitudes.erase(i + srcOffset);
@@ -312,14 +312,14 @@ public:
 
     void copy_out(complex* copyOut)
     {
-        for (bitCapIntOcl i = 0; i < capacity; i++) {
+        for (bitCapIntOcl i = 0U; i < capacity; ++i) {
             copyOut[i] = read(i);
         }
     }
 
     void copy_out(complex* copyOut, const bitCapIntOcl offset, const bitCapIntOcl length)
     {
-        for (bitCapIntOcl i = 0; i < length; i++) {
+        for (bitCapIntOcl i = 0U; i < length; ++i) {
             copyOut[i] = read(i + offset);
         }
     }
@@ -338,7 +338,7 @@ public:
     {
         const size_t halfCap = (size_t)(capacity >> ONE_BCI);
         std::lock_guard<std::mutex> lock(mtx);
-        for (bitCapIntOcl i = 0; i < halfCap; i++) {
+        for (bitCapIntOcl i = 0U; i < halfCap; ++i) {
             complex amp = svp->read(i);
             svp->write(i, read(i + halfCap));
             write(i + halfCap, amp);
@@ -347,7 +347,7 @@ public:
 
     void get_probs(real1* outArray)
     {
-        for (bitCapIntOcl i = 0; i < capacity; i++) {
+        for (bitCapIntOcl i = 0U; i < capacity; ++i) {
             outArray[i] = norm(read(i));
         }
     }
@@ -356,23 +356,22 @@ public:
 
     std::vector<bitCapIntOcl> iterable()
     {
-        const int64_t threadCount = GetConcurrencyLevel();
-        std::vector<std::vector<bitCapIntOcl>> toRet(threadCount);
+        std::vector<std::vector<bitCapIntOcl>> toRet(GetConcurrencyLevel());
         std::vector<std::vector<bitCapIntOcl>>::iterator toRetIt;
 
         // For lock_guard scope
         if (true) {
             std::lock_guard<std::mutex> lock(mtx);
 
-            par_for(0, amplitudes.size(), [&](const bitCapIntOcl& lcv, const unsigned& cpu) {
+            par_for(0U, amplitudes.size(), [&](const bitCapIntOcl& lcv, const unsigned& cpu) {
                 auto it = amplitudes.begin();
                 std::advance(it, lcv);
                 toRet[cpu].push_back(it->first);
             });
         }
 
-        for (int64_t i = (int64_t)(toRet.size() - 1); i >= 0; i--) {
-            if (toRet[i].size() == 0) {
+        for (int64_t i = (int64_t)(toRet.size() - 1U); i >= 0; i--) {
+            if (!toRet[i].size()) {
                 toRetIt = toRet.begin();
                 std::advance(toRetIt, i);
                 toRet.erase(toRetIt);
@@ -391,28 +390,28 @@ public:
                 toRet.pop_back();
             }
 
-            const int64_t combineCount = (int64_t)toRet.size() / 2U;
+            const int64_t combineCount = (int64_t)(toRet.size() >> 1U);
 #if ENABLE_PTHREAD
             std::vector<std::future<void>> futures(combineCount);
-            for (int64_t i = (combineCount - 1U); i >= 0; i--) {
+            for (int64_t i = (combineCount - 1); i >= 0; i--) {
                 futures[i] = std::async(std::launch::async, [i, combineCount, &toRet]() {
                     toRet[i].insert(toRet[i].end(), toRet[i + combineCount].begin(), toRet[i + combineCount].end());
                     toRet[i + combineCount].clear();
                 });
             }
-            for (int64_t i = (combineCount - 1U); i >= 0; i--) {
+            for (int64_t i = (combineCount - 1); i >= 0; i--) {
                 futures[i].get();
                 toRet.pop_back();
             }
 #else
-            for (int64_t i = (combineCount - 1U); i >= 0; i--) {
+            for (int64_t i = (combineCount - 1); i >= 0; i--) {
                 toRet[i].insert(toRet[i].end(), toRet[i + combineCount].begin(), toRet[i + combineCount].end());
                 toRet.pop_back();
             }
 #endif
         }
 
-        return toRet[0];
+        return toRet[0U];
     }
 
     /// Returns empty if iteration should be over full set, otherwise just the iterable elements:
@@ -425,8 +424,7 @@ public:
 
         const bitCapIntOcl unsetMask = ~setMask;
 
-        const int32_t threadCount = GetConcurrencyLevel();
-        std::vector<std::set<bitCapIntOcl>> toRet(threadCount);
+        std::vector<std::set<bitCapIntOcl>> toRet(GetConcurrencyLevel());
         std::vector<std::set<bitCapIntOcl>>::iterator toRetIt;
 
         // For lock_guard scope
@@ -434,14 +432,14 @@ public:
             std::lock_guard<std::mutex> lock(mtx);
 
             if (!filterMask && !filterValues) {
-                par_for(0, amplitudes.size(), [&](const bitCapIntOcl& lcv, const unsigned& cpu) {
+                par_for(0U, amplitudes.size(), [&](const bitCapIntOcl& lcv, const unsigned& cpu) {
                     auto it = amplitudes.begin();
                     std::advance(it, lcv);
                     toRet[cpu].insert(it->first & unsetMask);
                 });
             } else {
                 const bitCapIntOcl unfilterMask = ~filterMask;
-                par_for(0, amplitudes.size(), [&](const bitCapIntOcl lcv, const unsigned& cpu) {
+                par_for(0U, amplitudes.size(), [&](const bitCapIntOcl lcv, const unsigned& cpu) {
                     auto it = amplitudes.begin();
                     std::advance(it, lcv);
                     if ((it->first & filterMask) == filterValues) {
@@ -451,8 +449,8 @@ public:
             }
         }
 
-        for (int64_t i = (int64_t)(toRet.size() - 1); i >= 0; i--) {
-            if (toRet[i].size() == 0) {
+        for (int64_t i = (int64_t)(toRet.size() - 1U); i >= 0; i--) {
+            if (!toRet[i].size()) {
                 toRetIt = toRet.begin();
                 std::advance(toRetIt, i);
                 toRet.erase(toRetIt);
@@ -470,29 +468,29 @@ public:
                 toRet.pop_back();
             }
 
-            const int64_t combineCount = (int32_t)(toRet.size()) / 2U;
+            const int64_t combineCount = (int64_t)(toRet.size() >> 1U);
 #if ENABLE_PTHREAD
             std::vector<std::future<void>> futures(combineCount);
-            for (int64_t i = (combineCount - 1U); i >= 0; i--) {
+            for (int64_t i = (combineCount - 1); i >= 0; i--) {
                 futures[i] = std::async(std::launch::async, [i, combineCount, &toRet]() {
                     toRet[i].insert(toRet[i + combineCount].begin(), toRet[i + combineCount].end());
                     toRet[i + combineCount].clear();
                 });
             }
 
-            for (int64_t i = (combineCount - 1U); i >= 0; i--) {
+            for (int64_t i = (combineCount - 1); i >= 0; i--) {
                 futures[i].get();
                 toRet.pop_back();
             }
 #else
-            for (int64_t i = (combineCount - 1U); i >= 0; i--) {
+            for (int64_t i = (combineCount - 1); i >= 0; i--) {
                 toRet[i].insert(toRet[i + combineCount].begin(), toRet[i + combineCount].end());
                 toRet.pop_back();
             }
 #endif
         }
 
-        return toRet[0];
+        return toRet[0U];
     }
 };
 

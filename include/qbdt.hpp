@@ -109,10 +109,10 @@ public:
         bool useSparseStateVec = false, real1_f norm_thresh = REAL1_EPSILON, std::vector<int> ignored = {},
         bitLenInt qubitThreshold = 0, real1_f separation_thresh = FP_NORM_EPSILON_F);
 
-    QBdt(bitLenInt qBitCount, bitCapInt initState = 0, qrack_rand_gen_ptr rgp = nullptr,
+    QBdt(bitLenInt qBitCount, bitCapInt initState = 0U, qrack_rand_gen_ptr rgp = nullptr,
         complex phaseFac = CMPLX_DEFAULT_ARG, bool doNorm = false, bool randomGlobalPhase = true,
         bool useHostMem = false, int deviceId = -1, bool useHardwareRNG = true, bool useSparseStateVec = false,
-        real1_f norm_thresh = REAL1_EPSILON, std::vector<int> ignored = {}, bitLenInt qubitThreshold = 0,
+        real1_f norm_thresh = REAL1_EPSILON, std::vector<int> ignored = {}, bitLenInt qubitThreshold = 0U,
         real1_f separation_thresh = FP_NORM_EPSILON_F)
         : QBdt({ QINTERFACE_OPTIMAL_SCHROEDINGER }, qBitCount, initState, rgp, phaseFac, doNorm, randomGlobalPhase,
               useHostMem, deviceId, useHardwareRNG, useSparseStateVec, norm_thresh, ignored, qubitThreshold,
@@ -121,6 +121,8 @@ public:
     }
 
     virtual bool isBinaryDecisionTree() { return true; };
+
+    virtual void SetDevice(int dID) {}
 
     virtual void UpdateRunningNorm(real1_f norm_thresh = REAL1_DEFAULT_ARG)
     {
@@ -244,6 +246,24 @@ public:
     {
         QInterface::INCDECC(toAdd, start, length, carryIndex);
     }
+    virtual void MULModNOut(bitCapInt toMul, bitCapInt modN, bitLenInt inStart, bitLenInt outStart, bitLenInt length)
+    {
+        QInterface::MULModNOut(toMul, modN, inStart, outStart, length);
+    }
+    virtual void IMULModNOut(bitCapInt toMul, bitCapInt modN, bitLenInt inStart, bitLenInt outStart, bitLenInt length)
+    {
+        QInterface::IMULModNOut(toMul, modN, inStart, outStart, length);
+    }
+    virtual void CMULModNOut(bitCapInt toMul, bitCapInt modN, bitLenInt inStart, bitLenInt outStart, bitLenInt length,
+        const bitLenInt* controls, bitLenInt controlLen)
+    {
+        QInterface::CMULModNOut(toMul, modN, inStart, outStart, length, controls, controlLen);
+    }
+    virtual void CIMULModNOut(bitCapInt toMul, bitCapInt modN, bitLenInt inStart, bitLenInt outStart, bitLenInt length,
+        const bitLenInt* controls, bitLenInt controlLen)
+    {
+        QInterface::CIMULModNOut(toMul, modN, inStart, outStart, length, controls, controlLen);
+    }
     virtual void PhaseFlipIfLess(bitCapInt greaterPerm, bitLenInt start, bitLenInt length)
     {
         ExecuteAsStateVector(
@@ -290,16 +310,6 @@ public:
         ExecuteAsStateVector(
             [&](QInterfacePtr eng) { QINTERFACE_TO_QALU(eng)->DIV(toDiv, inOutStart, carryStart, length); });
     }
-    virtual void MULModNOut(bitCapInt toMul, bitCapInt modN, bitLenInt inStart, bitLenInt outStart, bitLenInt length)
-    {
-        ExecuteAsStateVector(
-            [&](QInterfacePtr eng) { QINTERFACE_TO_QALU(eng)->MULModNOut(toMul, modN, inStart, outStart, length); });
-    }
-    virtual void IMULModNOut(bitCapInt toMul, bitCapInt modN, bitLenInt inStart, bitLenInt outStart, bitLenInt length)
-    {
-        ExecuteAsStateVector(
-            [&](QInterfacePtr eng) { QINTERFACE_TO_QALU(eng)->IMULModNOut(toMul, modN, inStart, outStart, length); });
-    }
     virtual void POWModNOut(bitCapInt base, bitCapInt modN, bitLenInt inStart, bitLenInt outStart, bitLenInt length)
     {
         ExecuteAsStateVector(
@@ -317,20 +327,6 @@ public:
     {
         ExecuteAsStateVector([&](QInterfacePtr eng) {
             QINTERFACE_TO_QALU(eng)->CDIV(toDiv, inOutStart, carryStart, length, controls, controlLen);
-        });
-    }
-    virtual void CMULModNOut(bitCapInt toMul, bitCapInt modN, bitLenInt inStart, bitLenInt outStart, bitLenInt length,
-        const bitLenInt* controls, bitLenInt controlLen)
-    {
-        ExecuteAsStateVector([&](QInterfacePtr eng) {
-            QINTERFACE_TO_QALU(eng)->CMULModNOut(toMul, modN, inStart, outStart, length, controls, controlLen);
-        });
-    }
-    virtual void CIMULModNOut(bitCapInt toMul, bitCapInt modN, bitLenInt inStart, bitLenInt outStart, bitLenInt length,
-        const bitLenInt* controls, bitLenInt controlLen)
-    {
-        ExecuteAsStateVector([&](QInterfacePtr eng) {
-            QINTERFACE_TO_QALU(eng)->CIMULModNOut(toMul, modN, inStart, outStart, length, controls, controlLen);
         });
     }
     virtual void CPOWModNOut(bitCapInt base, bitCapInt modN, bitLenInt inStart, bitLenInt outStart, bitLenInt length,

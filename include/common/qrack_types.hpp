@@ -65,14 +65,14 @@
 #define bitsInCap (8U * (((bitLenInt)1U) << QBCAPPOW))
 #include <boost/multiprecision/cpp_int.hpp>
 #define bitCapInt                                                                                                      \
-    boost::multiprecision::number<boost::multiprecision::cpp_int_backend<1 << QBCAPPOW, 1 << QBCAPPOW,                 \
+    boost::multiprecision::number<boost::multiprecision::cpp_int_backend<1ULL << QBCAPPOW, 1ULL << QBCAPPOW,           \
         boost::multiprecision::unsigned_magnitude, boost::multiprecision::unchecked, void>>
 #endif
 
-#define bitsInByte 8
+#define bitsInByte 8U
 #define qrack_rand_gen std::mt19937_64
 #define qrack_rand_gen_ptr std::shared_ptr<qrack_rand_gen>
-#define QRACK_ALIGN_SIZE 64
+#define QRACK_ALIGN_SIZE 64U
 
 #if FPPOW < 5
 #if !defined(__arm__)
@@ -83,6 +83,7 @@ namespace Qrack {
 typedef std::complex<__fp16> complex;
 typedef __fp16 real1;
 typedef float real1_f;
+typedef float real1_s;
 #define ZERO_R1 0.0f
 #define ZERO_R1_F 0.0f
 #define ONE_R1 1.0f
@@ -97,6 +98,7 @@ typedef float real1_f;
 typedef std::complex<half_float::half> complex;
 typedef half_float::half real1;
 typedef float real1_f;
+typedef float real1_s;
 #define ZERO_R1 ((real1)0.0f)
 #define ZERO_R1_F 0.0f
 #define ONE_R1 ((real1)1.0f)
@@ -114,6 +116,7 @@ namespace Qrack {
 typedef std::complex<float> complex;
 typedef float real1;
 typedef float real1_f;
+typedef float real1_s;
 #define ZERO_R1 0.0f
 #define ZERO_R1_F 0.0f
 #define ONE_R1 1.0f
@@ -130,6 +133,7 @@ namespace Qrack {
 typedef std::complex<double> complex;
 typedef double real1;
 typedef double real1_f;
+typedef double real1_s;
 #define ZERO_R1 0.0
 #define ZERO_R1_F 0.0
 #define ONE_R1 1.0
@@ -147,7 +151,8 @@ typedef double real1_f;
 namespace Qrack {
 typedef std::complex<boost::multiprecision::float128> complex;
 typedef boost::multiprecision::float128 real1;
-typedef double real1_f;
+typedef boost::multiprecision::float128 real1_f;
+typedef double real1_s;
 #define ZERO_R1 ((real1)0.0)
 #define ZERO_R1_F 0.0
 #define ONE_R1 ((real1)1.0)
@@ -226,13 +231,22 @@ inline bitCapInt pow2Mask(const bitLenInt& p) { return ((bitCapInt)ONE_BCI << p)
 inline bitCapIntOcl pow2MaskOcl(const bitLenInt& p) { return ((bitCapIntOcl)ONE_BCI << p) - ONE_BCI; }
 inline bitLenInt log2(bitCapInt n)
 {
-    bitLenInt pow = 0;
+#if __GNUC__ && QBCAPPOW < 7
+// Source: https://stackoverflow.com/questions/11376288/fast-computing-of-log2-for-64-bit-integers#answer-11376759
+#if QBCAPPOW < 6
+    return (bitLenInt)(bitsInByte * sizeof(unsigned int) - __builtin_clz((unsigned int)n) - 1U);
+#else
+    return (bitLenInt)(bitsInByte * sizeof(unsigned long long) - __builtin_clzll((unsigned long long)n) - 1U);
+#endif
+#else
+    bitLenInt pow = 0U;
     bitCapInt p = n >> ONE_BCI;
-    while (p != 0) {
+    while (p) {
         p >>= ONE_BCI;
-        pow++;
+        ++pow;
     }
     return pow;
+#endif
 }
 inline bitCapInt bitSlice(const bitLenInt& bit, const bitCapInt& source)
 {
@@ -251,7 +265,7 @@ inline bitCapIntOcl bitRegMaskOcl(const bitLenInt& start, const bitLenInt& lengt
     return (((bitCapIntOcl)ONE_BCI << length) - ONE_BCI) << start;
 }
 // Source: https://www.exploringbinary.com/ten-ways-to-check-if-an-integer-is-a-power-of-two-in-c/
-inline bool isPowerOfTwo(const bitCapInt& x) { return ((x != 0U) && !(x & (x - ONE_BCI))); }
+inline bool isPowerOfTwo(const bitCapInt& x) { return (x && !(x & (x - ONE_BCI))); }
 
 // These are utility functions defined in qinterface/protected.cpp:
 unsigned char* cl_alloc(size_t ucharCount);
@@ -265,7 +279,8 @@ bool isOverflowSub(bitCapInt inOutInt, bitCapInt inInt, const bitCapInt& signMas
 bitCapInt pushApartBits(const bitCapInt& perm, const bitCapInt* skipPowers, const bitLenInt skipPowersCount);
 bitCapInt intPow(bitCapInt base, bitCapInt power);
 bitCapIntOcl intPowOcl(bitCapIntOcl base, bitCapIntOcl power);
-#if ENABLE_UINT128
-std::ostream& operator<<(std::ostream& left, __uint128_t right);
+#if QBCAPPOW == 7U
+std::ostream& operator<<(std::ostream& os, bitCapInt b);
+std::istream& operator>>(std::istream& is, bitCapInt& b);
 #endif
 } // namespace Qrack

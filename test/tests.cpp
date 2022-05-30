@@ -537,6 +537,25 @@ TEST_CASE_METHOD(QInterfaceTestFixture, "test_iswap")
     REQUIRE_THAT(qftReg, HasProbability(0, 8, 0x03));
 }
 
+TEST_CASE_METHOD(QInterfaceTestFixture, "test_Iiswap")
+{
+    qftReg->SetPermutation(1);
+    qftReg->IISwap(0, 1);
+    REQUIRE_THAT(qftReg, HasProbability(0, 8, 0x02));
+
+    qftReg->SetPermutation(0);
+    qftReg->H(0, 2);
+    qftReg->IISwap(0, 1);
+    qftReg->IISwap(0, 1);
+    qftReg->H(0, 2);
+    REQUIRE_THAT(qftReg, HasProbability(0, 8, 0x03));
+
+    qftReg->SetPermutation(1);
+    qftReg->ISwap(0, 1);
+    qftReg->IISwap(0, 1);
+    REQUIRE_THAT(qftReg, HasProbability(0, 8, 0x01));
+}
+
 TEST_CASE_METHOD(QInterfaceTestFixture, "test_cswap")
 {
     bitLenInt control[1] = { 8 };
@@ -4103,6 +4122,14 @@ TEST_CASE_METHOD(QInterfaceTestFixture, "test_mulmodnout")
     QALU(qftReg)->MULModNOut(2, 256U, 0, 8, 8);
     REQUIRE_FLOAT(ONE_R1_F / 2, (real1_f)qftReg->ProbAll(0));
     REQUIRE_FLOAT(ONE_R1_F / 2, (real1_f)qftReg->ProbAll(8 | (16 << 8)));
+
+    qftReg->SetPermutation(65);
+    QALU(qftReg)->MULModNOut(5, 125U, 0, 8, 8);
+    REQUIRE_THAT(qftReg, HasProbability(0, 16, 65 | (75 << 8)));
+
+    qftReg->SetPermutation(126);
+    QALU(qftReg)->MULModNOut(5, 125U, 0, 8, 8);
+    REQUIRE_THAT(qftReg, HasProbability(0, 16, 126 | (5 << 8)));
 }
 
 TEST_CASE_METHOD(QInterfaceTestFixture, "test_imulmodnout")
@@ -4110,6 +4137,16 @@ TEST_CASE_METHOD(QInterfaceTestFixture, "test_imulmodnout")
     qftReg->SetPermutation(65 | (69 << 8));
     QALU(qftReg)->IMULModNOut(5, 256U, 0, 8, 8);
     REQUIRE_THAT(qftReg, HasProbability(0, 16, 65));
+
+    qftReg->SetPermutation(65);
+    QALU(qftReg)->MULModNOut(5, 125U, 0, 8, 8);
+    QALU(qftReg)->IMULModNOut(5, 125U, 0, 8, 8);
+    REQUIRE_THAT(qftReg, HasProbability(0, 16, 65));
+
+    qftReg->SetPermutation(126);
+    QALU(qftReg)->MULModNOut(5, 125U, 0, 8, 8);
+    QALU(qftReg)->IMULModNOut(5, 125U, 0, 8, 8);
+    REQUIRE_THAT(qftReg, HasProbability(0, 16, 126));
 }
 
 TEST_CASE_METHOD(QInterfaceTestFixture, "test_powmodnout")
@@ -4195,6 +4232,14 @@ TEST_CASE_METHOD(QInterfaceTestFixture, "test_cmulmodnout", "[travis_xfail]")
     QALU(qftReg)->CMULModNOut(3, 256U, 0, 8, 8, controls, 1);
     REQUIRE_FLOAT(ONE_R1_F / 2, (real1_f)qftReg->ProbAll(3));
     REQUIRE_FLOAT(ONE_R1_F / 2, (real1_f)qftReg->ProbAll(3 | (9 << 8) | (1 << 16)));
+
+    qftReg->SetPermutation(65 | (1 << 16));
+    QALU(qftReg)->CMULModNOut(5, 125U, 0, 8, 8, controls, 1);
+    REQUIRE_THAT(qftReg, HasProbability(0, 16, 65 | (75 << 8)));
+
+    qftReg->SetPermutation(126 | (1 << 16));
+    QALU(qftReg)->CMULModNOut(5, 125U, 0, 8, 8, controls, 1);
+    REQUIRE_THAT(qftReg, HasProbability(0, 16, 126 | (5 << 8)));
 }
 
 TEST_CASE_METHOD(QInterfaceTestFixture, "test_cimulmodnout")
@@ -4210,6 +4255,16 @@ TEST_CASE_METHOD(QInterfaceTestFixture, "test_cimulmodnout")
     QALU(qftReg)->CMULModNOut(3, 256U, 0, 8, 8, controls, 1);
     QALU(qftReg)->CIMULModNOut(3, 256U, 0, 8, 8, controls, 1);
     REQUIRE_THAT(qftReg, HasProbability(0, 20, 3 | (1 << 16)));
+
+    qftReg->SetPermutation(65 | (1 << 16));
+    QALU(qftReg)->CMULModNOut(5, 125U, 0, 8, 8, controls, 1);
+    QALU(qftReg)->CIMULModNOut(5, 125U, 0, 8, 8, controls, 1);
+    REQUIRE_THAT(qftReg, HasProbability(0, 16, 65));
+
+    qftReg->SetPermutation(126 | (1 << 16));
+    QALU(qftReg)->CMULModNOut(5, 125U, 0, 8, 8, controls, 1);
+    QALU(qftReg)->CIMULModNOut(5, 125U, 0, 8, 8, controls, 1);
+    REQUIRE_THAT(qftReg, HasProbability(0, 16, 126));
 }
 
 TEST_CASE_METHOD(QInterfaceTestFixture, "test_cpowmodnout", "[travis_xfail]")
@@ -6021,7 +6076,7 @@ TEST_CASE_METHOD(QInterfaceTestFixture, "test_mirror_circuit_25", "[mirror]")
 bitLenInt pickRandomBit(QInterfacePtr qReg, std::set<bitLenInt>* unusedBitsPtr)
 {
     std::set<bitLenInt>::iterator bitIterator = unusedBitsPtr->begin();
-    bitLenInt bitRand = qReg->Rand() * unusedBitsPtr->size();
+    bitLenInt bitRand = (bitLenInt)(qReg->Rand() * unusedBitsPtr->size());
     if (bitRand >= unusedBitsPtr->size()) {
         bitRand = unusedBitsPtr->size() - 1U;
     }
@@ -6106,7 +6161,7 @@ TEST_CASE("test_mirror_circuit", "[mirror]")
             }
         }
 
-        bitCapIntOcl randPerm = testCase->Rand() * (bitCapIntOcl)testCase->GetMaxQPower();
+        bitCapIntOcl randPerm = (bitCapIntOcl)(testCase->Rand() * (bitCapIntOcl)testCase->GetMaxQPower());
         if (randPerm >= testCase->GetMaxQPower()) {
             randPerm = (bitCapIntOcl)testCase->GetMaxQPower() - 1U;
         }

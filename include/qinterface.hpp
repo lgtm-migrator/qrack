@@ -143,7 +143,7 @@ protected:
     bitCapInt maxQPower;
     uint32_t randomSeed;
     qrack_rand_gen_ptr rand_generator;
-    std::uniform_real_distribution<real1_f> rand_distribution;
+    std::uniform_real_distribution<real1_s> rand_distribution;
     std::shared_ptr<RdRandom> hardware_rand_generator;
     bool doNormalize;
     bool randGlobalPhase;
@@ -196,7 +196,7 @@ protected:
     template <typename Fn> void MACWrapper(const bitLenInt* controls, bitLenInt controlLen, Fn fn)
     {
         bitCapInt xMask = 0U;
-        for (bitLenInt i = 0; i < controlLen; i++) {
+        for (bitLenInt i = 0U; i < controlLen; ++i) {
             xMask |= pow2(controls[i]);
         }
 
@@ -211,8 +211,8 @@ public:
 
     /** Default constructor, primarily for protected internal use */
     QInterface()
-        : qubitCount(0)
-        , maxQPower(1)
+        : qubitCount(0U)
+        , maxQPower(1U)
         , randomSeed(0)
         , rand_distribution(0.0, 1.0)
         , hardware_rand_generator(NULL)
@@ -438,10 +438,10 @@ public:
      */
     virtual void MACMtrx(const bitLenInt* controls, bitLenInt controlLen, const complex* mtrx, bitLenInt target)
     {
-        if (IS_NORM_0(mtrx[1]) && IS_NORM_0(mtrx[2])) {
-            MACPhase(controls, controlLen, mtrx[0], mtrx[3], target);
-        } else if (IS_NORM_0(mtrx[0]) && IS_NORM_0(mtrx[3])) {
-            MACInvert(controls, controlLen, mtrx[1], mtrx[2], target);
+        if (IS_NORM_0(mtrx[1U]) && IS_NORM_0(mtrx[2U])) {
+            MACPhase(controls, controlLen, mtrx[0U], mtrx[3U], target);
+        } else if (IS_NORM_0(mtrx[0U]) && IS_NORM_0(mtrx[3U])) {
+            MACInvert(controls, controlLen, mtrx[1U], mtrx[2U], target);
         } else {
             MACWrapper(controls, controlLen,
                 [this, mtrx, target](const bitLenInt* lc, bitLenInt lcLen) { MCMtrx(lc, lcLen, mtrx, target); });
@@ -457,7 +457,7 @@ public:
             return;
         }
 
-        const complex mtrx[4] = { topLeft, ZERO_CMPLX, ZERO_CMPLX, bottomRight };
+        const complex mtrx[4U] = { topLeft, ZERO_CMPLX, ZERO_CMPLX, bottomRight };
         Mtrx(mtrx, qubitIndex);
     }
 
@@ -466,7 +466,7 @@ public:
      */
     virtual void Invert(const complex topRight, const complex bottomLeft, bitLenInt qubitIndex)
     {
-        const complex mtrx[4] = { ZERO_CMPLX, topRight, bottomLeft, ZERO_CMPLX };
+        const complex mtrx[4U] = { ZERO_CMPLX, topRight, bottomLeft, ZERO_CMPLX };
         Mtrx(mtrx, qubitIndex);
     }
 
@@ -480,7 +480,7 @@ public:
             return;
         }
 
-        const complex mtrx[4] = { topLeft, ZERO_CMPLX, ZERO_CMPLX, bottomRight };
+        const complex mtrx[4U] = { topLeft, ZERO_CMPLX, ZERO_CMPLX, bottomRight };
         MCMtrx(controls, controlLen, mtrx, target);
     }
 
@@ -491,7 +491,7 @@ public:
     virtual void MCInvert(
         const bitLenInt* controls, bitLenInt controlLen, complex topRight, complex bottomLeft, bitLenInt target)
     {
-        const complex mtrx[4] = { ZERO_CMPLX, topRight, bottomLeft, ZERO_CMPLX };
+        const complex mtrx[4U] = { ZERO_CMPLX, topRight, bottomLeft, ZERO_CMPLX };
         MCMtrx(controls, controlLen, mtrx, target);
     }
 
@@ -1495,8 +1495,11 @@ public:
     /** Bitwise swap */
     virtual void Swap(bitLenInt start1, bitLenInt start2, bitLenInt length);
 
-    /** Bitwise swap */
+    /** Bitwise ISwap */
     virtual void ISwap(bitLenInt start1, bitLenInt start2, bitLenInt length);
+
+    /** Bitwise IISwap */
+    virtual void IISwap(bitLenInt start1, bitLenInt start2, bitLenInt length);
 
     /** Bitwise square root of swap */
     virtual void SqrtSwap(bitLenInt start1, bitLenInt start2, bitLenInt length);
@@ -1848,6 +1851,20 @@ public:
     /** Subtract a classical integer from the register, with sign and without carry. */
     virtual void DECS(bitCapInt toSub, bitLenInt start, bitLenInt length, bitLenInt overflowIndex);
 
+    /** Multiplication modulo N by integer, (out of place) */
+    virtual void MULModNOut(bitCapInt toMul, bitCapInt modN, bitLenInt inStart, bitLenInt outStart, bitLenInt length);
+
+    /** Inverse of multiplication modulo N by integer, (out of place) */
+    virtual void IMULModNOut(bitCapInt toMul, bitCapInt modN, bitLenInt inStart, bitLenInt outStart, bitLenInt length);
+
+    /** Controlled multiplication modulo N by integer, (out of place) */
+    virtual void CMULModNOut(bitCapInt toMul, bitCapInt modN, bitLenInt inStart, bitLenInt outStart, bitLenInt length,
+        const bitLenInt* controls, bitLenInt controlLen);
+
+    /** Inverse of controlled multiplication modulo N by integer, (out of place) */
+    virtual void CIMULModNOut(bitCapInt toMul, bitCapInt modN, bitLenInt inStart, bitLenInt outStart, bitLenInt length,
+        const bitLenInt* controls, bitLenInt controlLen);
+
     /**
      * Quantum analog of classical "Full Adder" gate
      *
@@ -1984,6 +2001,9 @@ public:
     /** Swap values of two bits in register, and apply phase factor of i if bits are different */
     virtual void ISwap(bitLenInt qubitIndex1, bitLenInt qubitIndex2);
 
+    /** Inverse ISwap - Swap values of two bits in register, and apply phase factor of -i if bits are different */
+    virtual void IISwap(bitLenInt qubitIndex1, bitLenInt qubitIndex2);
+
     /** Square root of Swap gate */
     virtual void SqrtSwap(bitLenInt qubitIndex1, bitLenInt qubitIndex2);
 
@@ -1996,10 +2016,10 @@ public:
     /** Reverse all of the bits in a sequence. */
     virtual void Reverse(bitLenInt first, bitLenInt last)
     {
-        while ((last > 0) && first < (last - 1)) {
+        while ((last > 0U) && first < (last - 1U)) {
             last--;
             Swap(first, last);
-            first++;
+            ++first;
         }
     }
 
@@ -2077,7 +2097,7 @@ public:
      * Statistical measure of masked permutation probability
      *
      * "qPowers" contains powers of 2^n, each representing QInterface bit "n." The order of these values defines a mask
-     * for the result bitCapInt, of 2^0 ~ qPowers[0] to 2^(qPowerCount - 1) ~ qPowers[qPowerCount - 1], in contiguous
+     * for the result bitCapInt, of 2^0 ~ qPowers[0U] to 2^(qPowerCount - 1) ~ qPowers[qPowerCount - 1], in contiguous
      * ascending order. "shots" specifies the number of samples to take as if totally re-preparing the pre-measurement
      * state. This method returns a dictionary with keys, which are the (masked-order) measurement results, and values,
      * which are the number of "shots" that produced that particular measurement result. This method does not "collapse"
@@ -2097,7 +2117,7 @@ public:
      * \warning PSEUDO-QUANTUM
      */
     virtual void MultiShotMeasureMask(
-        const bitCapInt* qPowers, bitLenInt qPowerCount, unsigned shots, unsigned* shotsArray);
+        const bitCapInt* qPowers, bitLenInt qPowerCount, unsigned shots, unsigned long long* shotsArray);
 
     /**
      * Set individual bit to pure |0> (false) or |1> (true) state
@@ -2226,7 +2246,7 @@ public:
     /**
      *  Set the device index, if more than one device is available.
      */
-    virtual void SetDevice(int dID, bool forceReInit = false) {}
+    virtual void SetDevice(int dID) = 0;
 
     /**
      *  Get the device index. ("-1" is default).
@@ -2244,10 +2264,10 @@ public:
     virtual real1_f FirstNonzeroPhase()
     {
         complex amp;
-        bitCapInt perm = 0;
+        bitCapInt perm = 0U;
         do {
             amp = GetAmplitude(perm);
-            perm++;
+            ++perm;
         } while ((norm(amp) <= (REAL1_EPSILON * REAL1_EPSILON)) && (perm < maxQPower));
 
         return (real1_f)std::arg(amp);

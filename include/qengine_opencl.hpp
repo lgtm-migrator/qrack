@@ -64,6 +64,20 @@ struct QueueItem {
     bool doNorm;
     real1 runningNorm;
 
+    QueueItem()
+        : api_call()
+        , workItemCount(0U)
+        , localGroupSize(0U)
+        , deallocSize(0U)
+        , buffers()
+        , localBuffSize(0U)
+        , isSetDoNorm(false)
+        , isSetRunningNorm(true)
+        , doNorm(false)
+        , runningNorm(ONE_R1)
+    {
+    }
+
     QueueItem(OCLAPI ac, size_t wic, size_t lgs, size_t ds, std::vector<BufferPtr> b, size_t lbs)
         : api_call(ac)
         , workItemCount(wic)
@@ -80,11 +94,11 @@ struct QueueItem {
 
     QueueItem(bool doNrm)
         : api_call()
-        , workItemCount(0)
-        , localGroupSize(0)
-        , deallocSize(0)
+        , workItemCount(0U)
+        , localGroupSize(0U)
+        , deallocSize(0U)
         , buffers()
-        , localBuffSize(0)
+        , localBuffSize(0U)
         , isSetDoNorm(true)
         , isSetRunningNorm(false)
         , doNorm(doNrm)
@@ -94,11 +108,11 @@ struct QueueItem {
 
     QueueItem(real1_f runningNrm)
         : api_call()
-        , workItemCount(0)
-        , localGroupSize(0)
-        , deallocSize(0)
+        , workItemCount(0U)
+        , localGroupSize(0U)
+        , deallocSize(0U)
         , buffers()
-        , localBuffSize(0)
+        , localBuffSize(0U)
         , isSetDoNorm(false)
         , isSetRunningNorm(true)
         , doNorm(false)
@@ -233,7 +247,7 @@ public:
     QEngineOCL(bitLenInt qBitCount, bitCapInt initState, qrack_rand_gen_ptr rgp = nullptr,
         complex phaseFac = CMPLX_DEFAULT_ARG, bool doNorm = false, bool randomGlobalPhase = true,
         bool useHostMem = false, int devID = -1, bool useHardwareRNG = true, bool ignored = false,
-        real1_f norm_thresh = REAL1_EPSILON, std::vector<int> ignored2 = {}, bitLenInt ignored4 = 0,
+        real1_f norm_thresh = REAL1_EPSILON, std::vector<int> ignored2 = {}, bitLenInt ignored4 = 0U,
         real1_f ignored3 = FP_NORM_EPSILON_F);
 
     ~QEngineOCL()
@@ -272,16 +286,16 @@ public:
         // For lock_guard:
         if (true) {
             std::lock_guard<std::mutex> lock(queue_mutex);
-            isBase = (wait_queue_items.size() == 0);
+            isBase = !wait_queue_items.size();
             wait_queue_items.push_back(item);
         }
 
         if (isBase) {
-            DispatchQueue(NULL, CL_COMPLETE);
+            DispatchQueue();
         }
     }
     void QueueCall(OCLAPI api_call, size_t workItemCount, size_t localGroupSize, std::vector<BufferPtr> args,
-        size_t localBuffSize = 0, size_t deallocSize = 0)
+        size_t localBuffSize = 0U, size_t deallocSize = 0U)
     {
         AddQueueItem(QueueItem(api_call, workItemCount, localGroupSize, deallocSize, args, localBuffSize));
     }
@@ -394,7 +408,7 @@ public:
     bool ForceMParity(bitCapInt mask, bool result, bool doForce = true);
     real1_f ExpectationBitsAll(const bitLenInt* bits, bitLenInt length, bitCapInt offset = 0);
 
-    void SetDevice(int dID, bool forceReInit = false);
+    void SetDevice(int dID);
     int64_t GetDevice() { return deviceID; }
 
     void SetQuantumState(const complex* inputState);
@@ -411,12 +425,12 @@ public:
     ;
     void UpdateRunningNorm(real1_f norm_thresh = REAL1_DEFAULT_ARG);
     void Finish() { clFinish(); };
-    bool isFinished() { return (wait_queue_items.size() == 0); };
+    bool isFinished() { return !wait_queue_items.size(); };
 
     QInterfacePtr Clone();
 
-    void PopQueue(cl_event event, cl_int type);
-    void DispatchQueue(cl_event event, cl_int type);
+    void PopQueue();
+    void DispatchQueue();
 
 protected:
     void AddAlloc(size_t size)
@@ -541,15 +555,15 @@ protected:
 
     /* Utility functions used by the operations above. */
     void WaitCall(OCLAPI api_call, size_t workItemCount, size_t localGroupSize, std::vector<BufferPtr> args,
-        size_t localBuffSize = 0);
+        size_t localBuffSize = 0U);
     EventVecPtr ResetWaitEvents(bool waitQueue = true);
     void ApplyMx(OCLAPI api_call, bitCapIntOcl* bciArgs, complex nrm);
     real1_f Probx(OCLAPI api_call, bitCapIntOcl* bciArgs);
 
     void ArithmeticCall(OCLAPI api_call, bitCapIntOcl (&bciArgs)[BCI_ARG_LEN], const unsigned char* values = NULL,
-        bitCapIntOcl valuesLength = 0);
+        bitCapIntOcl valuesLength = 0U);
     void CArithmeticCall(OCLAPI api_call, bitCapIntOcl (&bciArgs)[BCI_ARG_LEN], bitCapIntOcl* controlPowers,
-        bitLenInt controlLen, const unsigned char* values = NULL, bitCapIntOcl valuesLength = 0);
+        bitLenInt controlLen, const unsigned char* values = NULL, bitCapIntOcl valuesLength = 0U);
     void ROx(OCLAPI api_call, bitLenInt shift, bitLenInt start, bitLenInt length);
 
 #if ENABLE_ALU

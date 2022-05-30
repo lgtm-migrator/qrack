@@ -168,8 +168,8 @@ public:
     cl::Platform platform;
     cl::Device device;
     cl::Context context;
-    int context_id;
-    int device_id;
+    int64_t context_id;
+    int64_t device_id;
     cl::CommandQueue queue;
     EventVecPtr wait_events;
 
@@ -187,14 +187,14 @@ private:
     size_t preferredConcurrency;
 
 public:
-    OCLDeviceContext(cl::Platform& p, cl::Device& d, cl::Context& c, int dev_id, int cntxt_id)
+    OCLDeviceContext(cl::Platform& p, cl::Device& d, cl::Context& c, int64_t dev_id, int64_t cntxt_id)
         : platform(p)
         , device(d)
         , context(c)
         , context_id(cntxt_id)
         , device_id(dev_id)
-        , preferredSizeMultiple(0)
-        , preferredConcurrency(0)
+        , preferredSizeMultiple(0U)
+        , preferredConcurrency(0U)
     {
         cl_int error;
         queue = cl::CommandQueue(context, d, CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE, &error);
@@ -309,6 +309,7 @@ public:
         static OCLEngine instance;
         return instance;
     }
+    /// Get default location for precompiled binaries:
     static std::string GetDefaultBinaryPath()
     {
 #if ENABLE_ENV_VARS
@@ -337,7 +338,7 @@ public:
     static InitOClResult InitOCL(bool buildFromSource = false, bool saveBinaries = false, std::string home = "*");
 
     /// Get a pointer one of the available OpenCL contexts, by its index in the list of all contexts.
-    DeviceContextPtr GetDeviceContextPtr(const int& dev = -1);
+    DeviceContextPtr GetDeviceContextPtr(const int64_t& dev = -1);
     /// Get the list of all available devices (and their supporting objects).
     std::vector<DeviceContextPtr> GetDeviceContextPtrVector();
     /** Set the list of DeviceContextPtr object available for use. If one takes the result of
@@ -351,13 +352,13 @@ public:
     size_t GetDefaultDeviceID() { return default_device_context->device_id; }
     /// Pick a default device, for QEngineOCL instances that don't specify a preferred device.
     void SetDefaultDeviceContext(DeviceContextPtr dcp);
-    /// Get default location for precompiled binaries:
     size_t GetMaxActiveAllocSize() { return maxActiveAllocSize; }
-    size_t GetActiveAllocSize(const int& dev)
+
+    size_t GetActiveAllocSize(const int64_t& dev)
     {
         return (dev < 0) ? activeAllocSizes[GetDefaultDeviceID()] : activeAllocSizes[(size_t)dev];
     }
-    size_t AddToActiveAllocSize(const int& dev, size_t size)
+    size_t AddToActiveAllocSize(const int64_t& dev, size_t size)
     {
         if (dev < -1) {
             throw std::runtime_error("Invalid device selection: " + std::to_string(dev));
@@ -373,7 +374,7 @@ public:
 
         return activeAllocSizes[lDev];
     }
-    size_t SubtractFromActiveAllocSize(const int& dev, size_t size)
+    size_t SubtractFromActiveAllocSize(const int64_t& dev, size_t size)
     {
         if (dev < -1) {
             throw std::runtime_error("Invalid device selection: " + std::to_string(dev));
@@ -392,7 +393,7 @@ public:
         }
         return activeAllocSizes[lDev];
     }
-    void ResetActiveAllocSize(const int& dev)
+    void ResetActiveAllocSize(const int64_t& dev)
     {
         int lDev = (dev == -1) ? GetDefaultDeviceID() : dev;
         std::lock_guard<std::mutex> lock(allocMutex);
@@ -417,12 +418,9 @@ private:
     OCLEngine(); // Private so that it can  not be called
 
     /// Make the program, from either source or binary
-    static cl::Program MakeProgram(bool buildFromSource, cl::Program::Sources sources, std::string path,
-        std::shared_ptr<OCLDeviceContext> devCntxt);
+    static cl::Program MakeProgram(bool buildFromSource, std::string path, std::shared_ptr<OCLDeviceContext> devCntxt);
     /// Save the program binary:
     static void SaveBinary(cl::Program program, std::string path, std::string fileName);
-
-    unsigned long PowerOf2LessThan(unsigned long number);
 };
 
 } // namespace Qrack

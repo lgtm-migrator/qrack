@@ -58,7 +58,7 @@ public:
     /** Default constructor, primarily for protected internal use */
     QEngine()
         : useHostRam(false)
-        , maxQPowerOcl(0)
+        , maxQPowerOcl(0U)
         , runningNorm(ONE_R1)
     {
         // Intentionally left blank
@@ -113,7 +113,7 @@ public:
 
     virtual void ApplyM(bitCapInt qPower, bool result, complex nrm)
     {
-        bitCapInt powerTest = result ? qPower : 0;
+        bitCapInt powerTest = result ? qPower : 0U;
         ApplyM(qPower, powerTest, nrm);
     }
     virtual void ApplyM(bitCapInt regMask, bitCapInt result, complex nrm) = 0;
@@ -163,12 +163,32 @@ public:
     {
         QInterface::INCDECC(toAdd, start, length, carryIndex);
     }
+    virtual void MULModNOut(bitCapInt toMul, bitCapInt modN, bitLenInt inStart, bitLenInt outStart, bitLenInt length)
+    {
+        QInterface::MULModNOut(toMul, modN, inStart, outStart, length);
+    }
+    virtual void IMULModNOut(bitCapInt toMul, bitCapInt modN, bitLenInt inStart, bitLenInt outStart, bitLenInt length)
+    {
+        QInterface::IMULModNOut(toMul, modN, inStart, outStart, length);
+    }
+    virtual void CMULModNOut(bitCapInt toMul, bitCapInt modN, bitLenInt inStart, bitLenInt outStart, bitLenInt length,
+        const bitLenInt* controls, bitLenInt controlLen)
+    {
+        QInterface::CMULModNOut(toMul, modN, inStart, outStart, length, controls, controlLen);
+    }
+    virtual void CIMULModNOut(bitCapInt toMul, bitCapInt modN, bitLenInt inStart, bitLenInt outStart, bitLenInt length,
+        const bitLenInt* controls, bitLenInt controlLen)
+    {
+        QInterface::CIMULModNOut(toMul, modN, inStart, outStart, length, controls, controlLen);
+    }
 #endif
 
     using QInterface::Swap;
     virtual void Swap(bitLenInt qubit1, bitLenInt qubit2);
     using QInterface::ISwap;
     virtual void ISwap(bitLenInt qubit1, bitLenInt qubit2);
+    using QInterface::IISwap;
+    virtual void IISwap(bitLenInt qubit1, bitLenInt qubit2);
     using QInterface::SqrtSwap;
     virtual void SqrtSwap(bitLenInt qubit1, bitLenInt qubit2);
     using QInterface::ISqrtSwap;

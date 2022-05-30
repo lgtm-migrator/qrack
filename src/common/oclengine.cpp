@@ -30,7 +30,7 @@
 #include "qheader_halfcl.hpp"
 #elif FPPOW < 6
 #include "qheader_floatcl.hpp"
-#elif FPPOW < 6
+#elif FPPOW < 7
 #include "qheader_doublecl.hpp"
 #else
 #include "qheader_quadcl.hpp"
@@ -50,7 +50,7 @@ namespace Qrack {
 /// "Qrack::OCLEngine" manages the single OpenCL context
 
 // Public singleton methods to get pointers to various methods
-DeviceContextPtr OCLEngine::GetDeviceContextPtr(const int& dev)
+DeviceContextPtr OCLEngine::GetDeviceContextPtr(const int64_t& dev)
 {
     if ((dev >= GetDeviceCount()) || (dev < -1)) {
         throw "Invalid OpenCL device selection";
@@ -156,8 +156,7 @@ void OCLEngine::SetDeviceContextPtrVector(std::vector<DeviceContextPtr> vec, Dev
 
 void OCLEngine::SetDefaultDeviceContext(DeviceContextPtr dcp) { default_device_context = dcp; }
 
-cl::Program OCLEngine::MakeProgram(
-    bool buildFromSource, cl::Program::Sources sources, std::string path, std::shared_ptr<OCLDeviceContext> devCntxt)
+cl::Program OCLEngine::MakeProgram(bool buildFromSource, std::string path, std::shared_ptr<OCLDeviceContext> devCntxt)
 {
     FILE* clBinFile;
     cl::Program program;
@@ -168,11 +167,9 @@ cl::Program OCLEngine::MakeProgram(
         if (fstat(fileno(clBinFile), &statSize)) {
             std::cout << "Binary error: Invalid file fstat result. (Falling back to JIT.)" << std::endl;
         } else {
-            unsigned long lSize = statSize.st_size;
-            unsigned long lSizeResult;
-
+            size_t lSize = statSize.st_size;
             std::vector<unsigned char> buffer(lSize);
-            lSizeResult = fread(&buffer[0], sizeof(unsigned char), lSize, clBinFile);
+            size_t lSizeResult = fread(&buffer[0U], sizeof(unsigned char), lSize, clBinFile);
             fclose(clBinFile);
 
             if (lSizeResult != lSize) {
@@ -183,13 +180,13 @@ cl::Program OCLEngine::MakeProgram(
 
 #if defined(__APPLE__) || (defined(_WIN32) && !defined(__CYGWIN__)) || ENABLE_SNUCL
             program = cl::Program(devCntxt->context, { devCntxt->device },
-                { std::pair<const void*, unsigned long>(&buffer[0], buffer.size()) }, &binaryStatus, &buildError);
+                { std::pair<const void*, size_t>(&buffer[0U], buffer.size()) }, &binaryStatus, &buildError);
 #else
             program = cl::Program(devCntxt->context, { devCntxt->device }, { buffer }, &binaryStatus, &buildError);
 #endif
 
-            if ((buildError != CL_SUCCESS) || (binaryStatus[0] != CL_SUCCESS)) {
-                std::cout << "Binary error: " << buildError << ", " << binaryStatus[0] << " (Falling back to JIT.)"
+            if ((buildError != CL_SUCCESS) || (binaryStatus[0U] != CL_SUCCESS)) {
+                std::cout << "Binary error: " << buildError << ", " << binaryStatus[0U] << " (Falling back to JIT.)"
                           << std::endl;
             } else {
                 std::cout << "Loaded binary from: " << path << std::endl;
@@ -198,10 +195,42 @@ cl::Program OCLEngine::MakeProgram(
     }
 
     // If, either, there are no cached binaries, or binary loading failed, then fall back to JIT.
-    if (buildError != CL_SUCCESS) {
-        program = cl::Program(devCntxt->context, sources);
-        std::cout << "Built JIT." << std::endl;
+    if (buildError == CL_SUCCESS) {
+        return program;
     }
+
+    cl::Program::Sources sources;
+#if UINTPOW < 4
+    sources.push_back({ (const char*)qheader_uint8_cl, (long unsigned int)qheader_uint8_cl_len });
+#elif UINTPOW < 5
+    sources.push_back({ (const char*)qheader_uint16_cl, (long unsigned int)qheader_uint16_cl_len });
+#elif UINTPOW < 6
+    sources.push_back({ (const char*)qheader_uint32_cl, (long unsigned int)qheader_uint32_cl_len });
+#else
+    sources.push_back({ (const char*)qheader_uint64_cl, (long unsigned int)qheader_uint64_cl_len });
+#endif
+
+#if FPPOW < 5
+    sources.push_back({ (const char*)qheader_half_cl, (long unsigned int)qheader_half_cl_len });
+#elif FPPOW < 6
+    sources.push_back({ (const char*)qheader_float_cl, (long unsigned int)qheader_float_cl_len });
+#elif FPPOW < 7
+    sources.push_back({ (const char*)qheader_double_cl, (long unsigned int)qheader_double_cl_len });
+#else
+    sources.push_back({ (const char*)qheader_quad_cl, (long unsigned int)qheader_quad_cl_len });
+#endif
+
+    sources.push_back({ (const char*)qengine_cl, (long unsigned int)qengine_cl_len });
+
+#if ENABLE_ALU
+    sources.push_back({ (const char*)qheader_alu_cl, (long unsigned int)qheader_alu_cl_len });
+#if ENABLE_BCD
+    sources.push_back({ (const char*)qheader_bcd_cl, (long unsigned int)qheader_bcd_cl_len });
+#endif
+#endif
+
+    program = cl::Program(devCntxt->context, sources);
+    std::cout << "Building JIT." << std::endl;
 
     return program;
 }
@@ -209,11 +238,11 @@ cl::Program OCLEngine::MakeProgram(
 void OCLEngine::SaveBinary(cl::Program program, std::string path, std::string fileName)
 {
     std::vector<size_t> clBinSizes = program.getInfo<CL_PROGRAM_BINARY_SIZES>();
-    size_t clBinSize = 0;
-    int clBinIndex = 0;
+    size_t clBinSize = 0U;
+    int64_t clBinIndex = 0;
 
-    for (unsigned int i = 0; i < clBinSizes.size(); i++) {
-        if (clBinSizes[i] > 0) {
+    for (size_t i = 0U; i < clBinSizes.size(); ++i) {
+        if (clBinSizes[i]) {
             clBinSize = clBinSizes[i];
             clBinIndex = i;
             break;
@@ -239,7 +268,7 @@ void OCLEngine::SaveBinary(cl::Program program, std::string path, std::string fi
 #else
     std::vector<std::vector<unsigned char>> clBinaries = program.getInfo<CL_PROGRAM_BINARIES>();
     std::vector<unsigned char> clBinary = clBinaries[clBinIndex];
-    fwrite(&clBinary[0], clBinSize, sizeof(unsigned char), clBinFile);
+    fwrite(&clBinary[0U], clBinSize, sizeof(unsigned char), clBinFile);
 #endif
     fclose(clBinFile);
 }
@@ -254,7 +283,7 @@ InitOClResult OCLEngine::InitOCL(bool buildFromSource, bool saveBinaries, std::s
 
     std::vector<cl::Platform> all_platforms;
     std::vector<cl::Device> all_devices;
-    std::vector<int> device_platform_id;
+    std::vector<int64_t> device_platform_id;
     cl::Platform default_platform;
     cl::Device default_device;
     std::vector<DeviceContextPtr> all_dev_contexts;
@@ -262,7 +291,7 @@ InitOClResult OCLEngine::InitOCL(bool buildFromSource, bool saveBinaries, std::s
 
     cl::Platform::get(&all_platforms);
 
-    if (all_platforms.size() == 0) {
+    if (!all_platforms.size()) {
         std::cout << " No platforms found. Check OpenCL installation!\n";
         return InitOClResult();
     }
@@ -270,10 +299,10 @@ InitOClResult OCLEngine::InitOCL(bool buildFromSource, bool saveBinaries, std::s
     // get all devices
     std::vector<cl::Platform> devPlatVec;
     std::vector<std::vector<cl::Device>> all_platforms_devices;
-    for (size_t i = 0; i < all_platforms.size(); i++) {
+    for (size_t i = 0U; i < all_platforms.size(); ++i) {
         all_platforms_devices.push_back(std::vector<cl::Device>());
         all_platforms[i].getDevices(CL_DEVICE_TYPE_ALL, &(all_platforms_devices[i]));
-        for (size_t j = 0; j < all_platforms_devices[i].size(); j++) {
+        for (size_t j = 0U; j < all_platforms_devices[i].size(); ++j) {
             // VirtualCL seems to break if the assignment constructor of cl::Platform is used here from the original
             // list. Assigning the object from a new query is always fine, though. (They carry the same underlying
             // platform IDs.)
@@ -284,15 +313,14 @@ InitOClResult OCLEngine::InitOCL(bool buildFromSource, bool saveBinaries, std::s
         }
         all_devices.insert(all_devices.end(), all_platforms_devices[i].begin(), all_platforms_devices[i].end());
     }
-    if (all_devices.size() == 0) {
+    if (!all_devices.size()) {
         std::cout << " No devices found. Check OpenCL installation!\n";
         return InitOClResult();
     }
 
-    int deviceCount = all_devices.size();
-
-    // prefer the last device because that's usually a GPU or accelerator; device[0] is usually the CPU
-    int dev = deviceCount - 1;
+    int64_t deviceCount = all_devices.size();
+    // prefer the last device because that's usually a GPU or accelerator; device[0U] is usually the CPU
+    int64_t dev = deviceCount - 1;
     if (getenv("QRACK_OCL_DEFAULT_DEVICE")) {
         dev = std::stoi(std::string(getenv("QRACK_OCL_DEFAULT_DEVICE")));
         if ((dev < 0) || (dev > (deviceCount - 1))) {
@@ -304,40 +332,10 @@ InitOClResult OCLEngine::InitOCL(bool buildFromSource, bool saveBinaries, std::s
     }
 
     // create the programs that we want to execute on the devices
-    cl::Program::Sources sources;
-#if UINTPOW < 4
-    sources.push_back({ (const char*)qheader_uint8_cl, (long unsigned int)qheader_uint8_cl_len });
-#elif UINTPOW < 5
-    sources.push_back({ (const char*)qheader_uint16_cl, (long unsigned int)qheader_uint16_cl_len });
-#elif UINTPOW < 6
-    sources.push_back({ (const char*)qheader_uint32_cl, (long unsigned int)qheader_uint32_cl_len });
-#else
-    sources.push_back({ (const char*)qheader_uint64_cl, (long unsigned int)qheader_uint64_cl_len });
-#endif
-
-#if FPPOW < 5
-    sources.push_back({ (const char*)qheader_half_cl, (long unsigned int)qheader_half_cl_len });
-#elif FPPOW < 6
-    sources.push_back({ (const char*)qheader_float_cl, (long unsigned int)qheader_float_cl_len });
-#elif FPPOW < 6
-    sources.push_back({ (const char*)qheader_double_cl, (long unsigned int)qheader_double_cl_len });
-#else
-    sources.push_back({ (const char*)qheader_quad_cl, (long unsigned int)qheader_quad_cl_len });
-#endif
-
-    sources.push_back({ (const char*)qengine_cl, (long unsigned int)qengine_cl_len });
-
-#if ENABLE_ALU
-    sources.push_back({ (const char*)qheader_alu_cl, (long unsigned int)qheader_alu_cl_len });
-#if ENABLE_BCD
-    sources.push_back({ (const char*)qheader_bcd_cl, (long unsigned int)qheader_bcd_cl_len });
-#endif
-#endif
-
-    int plat_id = -1;
+    int64_t plat_id = -1;
     std::vector<cl::Context> all_contexts;
     std::vector<std::string> all_filenames;
-    for (int i = 0; i < deviceCount; i++) {
+    for (int64_t i = 0; i < deviceCount; ++i) {
         // a context is like a "runtime link" to the device and platform;
         // i.e. communication is possible
         if (device_platform_id[i] != plat_id) {
@@ -345,14 +343,14 @@ InitOClResult OCLEngine::InitOCL(bool buildFromSource, bool saveBinaries, std::s
             all_contexts.push_back(cl::Context(all_platforms_devices[plat_id]));
         }
         std::shared_ptr<OCLDeviceContext> devCntxt = std::make_shared<OCLDeviceContext>(
-            devPlatVec[i], all_devices[i], all_contexts[all_contexts.size() - 1], i, plat_id);
+            devPlatVec[i], all_devices[i], all_contexts[all_contexts.size() - 1U], i, plat_id);
 
         std::string fileName = binary_file_prefix + all_devices[i].getInfo<CL_DEVICE_NAME>() + binary_file_ext;
         std::replace(fileName.begin(), fileName.end(), ' ', '_');
         std::string clBinName = home + fileName;
 
         std::cout << "Device #" << i << ", ";
-        cl::Program program = MakeProgram(buildFromSource, sources, clBinName, devCntxt);
+        cl::Program program = MakeProgram(buildFromSource, clBinName, devCntxt);
 
         cl_int buildError =
             program.build({ all_devices[i] }, "-cl-strict-aliasing -cl-denorms-are-zero -cl-fast-relaxed-math");
@@ -365,9 +363,9 @@ InitOClResult OCLEngine::InitOCL(bool buildFromSource, bool saveBinaries, std::s
             // use the first device. If the default is the first device, and we can't compile for it, then we don't
             // have any devices that can compile at all, and the environment needs to be fixed by the user.
             if (i == dev) {
-                default_dev_context = all_dev_contexts[0];
-                default_platform = all_platforms[0];
-                default_device = all_devices[0];
+                default_dev_context = all_dev_contexts[0U];
+                default_platform = all_platforms[0U];
+                default_device = all_devices[0U];
             }
 
             continue;
@@ -375,7 +373,7 @@ InitOClResult OCLEngine::InitOCL(bool buildFromSource, bool saveBinaries, std::s
 
         all_dev_contexts.push_back(devCntxt);
 
-        for (unsigned int j = 0; j < kernelHandles.size(); j++) {
+        for (unsigned int j = 0U; j < kernelHandles.size(); ++j) {
             all_dev_contexts[i]->calls[kernelHandles[j].oclapi] =
                 cl::Kernel(program, kernelHandles[j].kernelname.c_str());
             all_dev_contexts[i]->mutexes.emplace(kernelHandles[j].oclapi, new std::mutex);
@@ -397,7 +395,7 @@ InitOClResult OCLEngine::InitOCL(bool buildFromSource, bool saveBinaries, std::s
     // For VirtualCL support, the device info can only be accessed AFTER all contexts are created.
     std::cout << "Default platform: " << default_platform.getInfo<CL_PLATFORM_NAME>() << "\n";
     std::cout << "Default device: #" << dev << ", " << default_device.getInfo<CL_DEVICE_NAME>() << "\n";
-    for (int i = 0; i < deviceCount; i++) {
+    for (int64_t i = 0; i < deviceCount; ++i) {
         std::cout << "OpenCL device #" << i << ": " << all_devices[i].getInfo<CL_DEVICE_NAME>() << "\n";
     }
 
@@ -408,7 +406,7 @@ OCLEngine::OCLEngine()
     : maxActiveAllocSize(-1)
 {
     if (getenv("QRACK_MAX_ALLOC_MB")) {
-        maxActiveAllocSize = 1024 * 1024 * (size_t)std::stoi(std::string(getenv("QRACK_MAX_ALLOC_MB")));
+        maxActiveAllocSize = 1024U * 1024U * (size_t)std::stoi(std::string(getenv("QRACK_MAX_ALLOC_MB")));
     }
 
     InitOClResult initResult = InitOCL(false);

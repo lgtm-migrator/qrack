@@ -12,14 +12,15 @@
 
 #include "qfactory.hpp"
 
+#define CATCH_CONFIG_RUNNER /* Access to the configuration. */
+#include "tests.hpp"
+
 #include <iostream>
 #include <random>
+#include <regex>
 #include <sstream>
 #include <stdio.h>
 #include <stdlib.h>
-
-#define CATCH_CONFIG_RUNNER /* Access to the configuration. */
-#include "tests.hpp"
 
 using namespace Qrack;
 
@@ -163,6 +164,10 @@ int main(int argc, char* argv[])
         session.config().stream() << "QRACK_QPAGER_DEVICES: " << std::string(getenv("QRACK_QPAGER_DEVICES"))
                                   << std::endl;
     }
+    if (getenv("QRACK_QPAGER_DEVICES_HOST_POINTER")) {
+        session.config().stream() << "QRACK_QPAGER_DEVICES_HOST_POINTER: "
+                                  << std::string(getenv("QRACK_QPAGER_DEVICES_HOST_POINTER")) << std::endl;
+    }
 #endif
 
     if (!qengine && !qpager && !qunit && !qunit_multi && !qunit_qpager && !qunit_multi_qpager) {
@@ -186,10 +191,29 @@ int main(int argc, char* argv[])
 
     if (devListStr.compare("") != 0) {
         std::stringstream devListStr_stream(devListStr);
+        // See
+        // https://stackoverflow.com/questions/7621727/split-a-string-into-words-by-multiple-delimiters#answer-58164098
+        std::regex re("[.]");
         while (devListStr_stream.good()) {
-            std::string substr;
-            getline(devListStr_stream, substr, ',');
-            devList.push_back(stoi(substr));
+            std::string term;
+            getline(devListStr_stream, term, ',');
+            // the '-1' is what makes the regex split (-1 := what was not matched)
+            std::sregex_token_iterator first{ term.begin(), term.end(), re, -1 }, last;
+            std::vector<std::string> tokens{ first, last };
+            if (tokens.size() == 1U) {
+                devList.push_back(stoi(term));
+                continue;
+            }
+            const unsigned maxI = stoi(tokens[0]);
+            std::vector<int> ids(tokens.size() - 1U);
+            for (unsigned i = 1U; i < tokens.size(); i++) {
+                ids[i - 1U] = stoi(tokens[i]);
+            }
+            for (unsigned i = 0U; i < maxI; i++) {
+                for (unsigned j = 0U; j < ids.size(); j++) {
+                    devList.push_back(ids[j]);
+                }
+            }
         }
     }
 
@@ -326,8 +350,8 @@ int main(int argc, char* argv[])
     if (num_failed == 0 && qengine && stabilizer_qpager) {
         testEngineType = QINTERFACE_STABILIZER_HYBRID;
         testSubEngineType = QINTERFACE_QPAGER;
-        testSubSubEngineType = QINTERFACE_HYBRID;
-        session.config().stream() << "############ QStabilizerHybrid -> QPager -> QHybrid ############" << std::endl;
+        testSubSubEngineType = QINTERFACE_OPENCL;
+        session.config().stream() << "############ QStabilizerHybrid -> QPager -> QEngineOCL ############" << std::endl;
         num_failed = session.run();
     }
 #endif
